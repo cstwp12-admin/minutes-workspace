@@ -177,10 +177,12 @@ export function parseDocxXml(xml:string,filename='meeting.docx'):MeetingDocument
       if(ref){
         const content=subject?.text??combined?.[2]??row.filter(c=>c!==getCell('ref')).map(c=>c.text).join(' ')
         const heading=content.split('\n')[0].slice(0,160)
-        const action=getCell('action')?.text??''
-        const rawDate=getCell('deadline')?.text??''
+        const labelled=(label:RegExp)=>blocks.filter(block=>block.type==='paragraph').map(block=>block.text.match(label)?.[1]?.trim()).find(Boolean)||''
+        const action=getCell('action')?.text||labelled(/^(?:Action|Required action|Next action|Corrective action|Required response|Commitment|Backlog action|Next step):\s*(.+)$/is)
+        const rawDate=getCell('deadline')?.text||labelled(/^(?:Due|Deadline|Due date):\s*(.+)$/is)
         const deadline=normalizedDate(rawDate)
         const item=addItem(ref,heading,blocks,owner,parseStatus(rawStatus),index,ri+1,false,action,deadline)
+        item.decision=labelled(/^(?:Decision|Agreement|Technical disposition|Control decision|Agreed outcome|Product decision):\s*(.+)$/is)||undefined
         if(rawStatus.trim()&&parseStatus(rawStatus)==='-'&&rawStatus.trim()!=='-')warnings.add(`${ref}: status “${rawStatus}” was not mapped; check the original.`)
         extractSubactions(item,blocks)
       }else if(last&&row.some(c=>c.text||c.blocks.some(b=>b.type==='metric_table'))){

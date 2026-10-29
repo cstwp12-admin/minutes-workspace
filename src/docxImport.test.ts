@@ -5,7 +5,7 @@ import { importDocx,parseDocxXml } from './docxImport'
 import { createMeetingDocxDocument } from './docxExport'
 import { defaultExportProfile } from './ExportView'
 
-import { fictionalMinutesXml, p, wrap } from './test/docxFixture'
+import { fictionalMinutesXml, p, wrap, cell } from './test/docxFixture'
 
 describe('DOCX import and export',()=>{
   it('extracts metadata, hierarchy, attendance and honest source anchors',()=>{
@@ -52,5 +52,11 @@ describe('DOCX import and export',()=>{
     const result=parseDocxXml(xml)
     expect(result.importEvidence?.paragraphs.join('')).toContain('Accepted content')
     expect(result.importEvidence?.paragraphs.join('')).not.toContain('Deleted content')
+  })
+  it('recognizes labelled actions, decisions and dates in exported minutes',()=>{
+    const xml=wrap('<w:tbl><w:tr>'+cell('No.')+cell('Subject')+cell('Action by')+cell('Status')+'</w:tr><w:tr>'+cell('1.1')+'<w:tc>'+p('Review')+p('Action: Publish the plan')+p('Due: 2026-11-10')+p('Decision: Proceed')+'</w:tc>'+cell('Team')+cell('Open')+'</w:tr></w:tbl>')
+    const item=parseDocxXml(xml).items[0]
+    expect(item.action).toMatchObject({requiredAction:'Publish the plan',deadline:'2026-11-10'})
+    expect(item.decision).toBe('Proceed')
   })
 })

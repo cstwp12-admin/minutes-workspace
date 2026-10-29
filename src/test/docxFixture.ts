@@ -1,5 +1,5 @@
 export const p=(value:string)=>`<w:p><w:r><w:t>${value}</w:t></w:r></w:p>`
-const cell=(value:string,props='')=>`<w:tc><w:tcPr>${props}</w:tcPr>${p(value)}</w:tc>`
+export const cell=(value:string,props='')=>`<w:tc><w:tcPr>${props}</w:tcPr>${p(value)}</w:tc>`
 const row=(...cells:string[])=>`<w:tr>${cells.join('')}</w:tr>`
 export const wrap=(value:string)=>`<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${value}</w:body></w:document>`
 export const fictionalMinutesXml=wrap(
