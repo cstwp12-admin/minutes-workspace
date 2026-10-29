@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Download, FileJson, FileSpreadsheet, FileType2, ImagePlus, Printer, ShieldCheck, Trash2 } from 'lucide-react'
 import { exportSnapshot, type ExportProfile, type MeetingDocument } from './model'
+import { exportTemplates, getExportTemplate } from './exportTemplates'
 
 export const defaultExportProfile: ExportProfile = {
-  organizationName: '', projectName: '', documentTitle: 'Minutes of Meeting',
+  templateId: 'standard', organizationName: '', projectName: '', documentTitle: 'Minutes of Meeting',
   primaryColor: '#173b2f', distribution: ''
 }
 
@@ -42,6 +43,7 @@ const printableStyles = `
 export function ExportView({ meeting, onChange, notify }: { meeting: MeetingDocument; onChange: (meeting: MeetingDocument) => void; notify: (message: string) => void }) {
   const [generatingWord,setGeneratingWord]=useState(false)
   const profile = { ...defaultExportProfile, ...meeting.exportProfile }
+  const selectedTemplate = getExportTemplate(profile.templateId)
   const updateProfile = (patch: Partial<ExportProfile>) => onChange({ ...meeting, exportProfile: { ...profile, ...patch } })
   const baseName = safeName(`${meeting.meetingType}-${meeting.meetingNumber}`)
   const exportHtml = () => {
@@ -55,6 +57,7 @@ export function ExportView({ meeting, onChange, notify }: { meeting: MeetingDocu
     if (!['image/png','image/jpeg','image/svg+xml'].includes(file.type) || file.size > 1_000_000) { notify('Choose a PNG, JPG or SVG logo under 1 MB'); return }
     const reader = new FileReader(); reader.onload = () => updateProfile({ logoDataUrl: String(reader.result) }); reader.readAsDataURL(file)
   }
+  const chooseTemplate = (template: typeof exportTemplates[number]) => updateProfile({templateId:template.id,documentTitle:template.documentTitle,primaryColor:template.accent})
   const printPdf = () => { notify('Use the print dialog to save as PDF'); window.setTimeout(() => window.print(), 100) }
   const exportWord = async () => {
     setGeneratingWord(true)
@@ -66,6 +69,7 @@ export function ExportView({ meeting, onChange, notify }: { meeting: MeetingDocu
     <section className="export-controls">
       <div><span className="eyebrow">Phase 5 · Official output</span><h1>Publish-ready minutes</h1><p>Set document identity at runtime. Nothing here is embedded in the public app source.</p></div>
       <div className="privacy-note"><ShieldCheck size={19}/><span><b>Project-neutral by design</b> Identity and logo are saved only with this local meeting record.</span></div>
+      <fieldset className="template-picker"><legend>Document template</legend><div className="template-grid">{exportTemplates.map(template=><button type="button" key={template.id} className={selectedTemplate.id===template.id?'selected':''} onClick={()=>chooseTemplate(template)} aria-pressed={selectedTemplate.id===template.id}><span className="template-swatch" style={{background:template.accent}}/><span><b>{template.name}</b><small>{template.category} · {template.description}</small></span></button>)}</div></fieldset>
       <div className="export-form">
         <label>Document title<input value={profile.documentTitle} onChange={e=>updateProfile({documentTitle:e.target.value})}/></label>
         <label>Organization name<input value={profile.organizationName} placeholder="Optional" onChange={e=>updateProfile({organizationName:e.target.value})}/></label>
@@ -91,14 +95,15 @@ export function ExportView({ meeting, onChange, notify }: { meeting: MeetingDocu
 
 function OfficialDocument({ meeting, profile }: { meeting: MeetingDocument; profile: ExportProfile }) {
   const minutes = meeting.items.filter(item => item.type === 'minute')
+  const template = getExportTemplate(profile.templateId)
   return <article className="official-document" style={{'--doc-color': profile.primaryColor} as React.CSSProperties}>
     {meeting.lifecycle!=='finalized'&&<div className="draft-watermark">DRAFT</div>}
     <header className="document-masthead">{profile.logoDataUrl?<img className="document-logo" src={profile.logoDataUrl} alt="Organization logo"/>:<div/>}<div className="document-brand">{profile.projectName&&<span>{profile.projectName}</span>}<b>{profile.organizationName || 'Meeting workspace'}</b></div><div className="issue-badge">Issue<b>{meeting.lifecycle==='finalized'?'Final':'Draft'}</b>Revision {meeting.revision ?? 1}</div></header>
     <h1>{profile.documentTitle}</h1><p className="document-subtitle">{meeting.title}</p>
     <table className="metadata"><tbody><tr><th>Meeting type</th><td>{meeting.meetingType}</td><th>Meeting no.</th><td>{meeting.meetingNumber}</td></tr><tr><th>Date</th><td>{meeting.date}</td><th>Venue</th><td>{meeting.venue}</td></tr><tr><th>Chair</th><td>{meeting.chair}</td><th>Status</th><td>{meeting.lifecycle.replaceAll('_',' ')}</td></tr></tbody></table>
-    {!!meeting.participants?.length&&<><h2>Attendance</h2><table><thead><tr><th>Name</th><th>Organization</th><th>Role</th><th>Attendance</th></tr></thead><tbody>{meeting.participants.map(p=><tr key={p.id}><td>{p.name}</td><td>{p.organization}</td><td>{p.role}</td><td>{p.attendance}</td></tr>)}</tbody></table></>}
-    <h2>Meeting minutes</h2><table className="minutes-table"><thead><tr><th className="ref-col">No.</th><th>Subject / discussion / decision</th><th className="owner-col">Action by</th><th className="status-col">Status</th></tr></thead><tbody>{minutes.map(item=><tr key={item.id}><td>{item.itemRef}</td><td><div className="minute-title" style={{marginLeft:`${Math.max(0,item.depth-1)*10}px`}}>{item.title}</div>{item.discussion&&<div className="minute-copy">{item.discussion}</div>}{item.blocks.map((block,index)=>block.type==='paragraph'?<div className="minute-copy" key={index}>{block.text}</div>:<table className="nested-table" key={index}><caption>{block.title}</caption><thead><tr>{block.columns.map(column=><th key={column}>{column}</th>)}</tr></thead><tbody>{block.rows.map((row,rowIndex)=><tr key={rowIndex}>{row.map((cell,cellIndex)=><td key={cellIndex}>{cell}</td>)}</tr>)}</tbody></table>)}{item.decision&&<div className="minute-decision"><b>Decision:</b> {item.decision}</div>}{item.action&&<div className="minute-decision"><b>Action:</b> {item.action.requiredAction}<br/><b>Due:</b> {item.action.deadline || 'Not set'}</div>}</td><td>{item.action?.owner || item.owner}</td><td>{item.action?.status || item.status}</td></tr>)}</tbody></table>
+    {template.showAttendance&&!!meeting.participants?.length&&<><h2>Attendance</h2><table><thead><tr><th>Name</th><th>Organization</th><th>Role</th><th>Attendance</th></tr></thead><tbody>{meeting.participants.map(p=><tr key={p.id}><td>{p.name}</td><td>{p.organization}</td><td>{p.role}</td><td>{p.attendance}</td></tr>)}</tbody></table></>}
+    <h2>{template.sectionTitle}</h2><table className="minutes-table"><thead><tr><th className="ref-col">No.</th><th>{template.subjectHeading}</th><th className="owner-col">{template.ownerHeading}</th><th className="status-col">{template.statusHeading}</th></tr></thead><tbody>{minutes.map(item=><tr key={item.id}><td>{item.itemRef}</td><td><div className="minute-title" style={{marginLeft:`${Math.max(0,item.depth-1)*10}px`}}>{item.title}</div>{item.discussion&&<div className="minute-copy">{item.discussion}</div>}{item.blocks.map((block,index)=>block.type==='paragraph'?<div className="minute-copy" key={index}>{block.text}</div>:<table className="nested-table" key={index}><caption>{block.title}</caption><thead><tr>{block.columns.map(column=><th key={column}>{column}</th>)}</tr></thead><tbody>{block.rows.map((row,rowIndex)=><tr key={rowIndex}>{row.map((cell,cellIndex)=><td key={cellIndex}>{cell}</td>)}</tr>)}</tbody></table>)}{item.decision&&<div className="minute-decision"><b>{template.decisionLabel}:</b> {item.decision}</div>}{item.action&&<div className="minute-decision"><b>{template.actionLabel}:</b> {item.action.requiredAction}<br/><b>Due:</b> {item.action.deadline || 'Not set'}</div>}</td><td>{item.action?.owner || item.owner}</td><td>{item.action?.status || item.status}</td></tr>)}</tbody></table>
     <div className="approval-grid"><div className="approval-box"><span>Prepared by</span>{meeting.preparedBy || '—'}</div><div className="approval-box"><span>Checked by</span>{meeting.checkedBy || '—'}</div><div className="approval-box"><span>Approved by</span>{meeting.approvedBy || '—'}</div></div>
-    {profile.distribution&&<div className="distribution"><b>Distribution</b><div>{profile.distribution}</div></div>}
+    {template.showDistribution&&profile.distribution&&<div className="distribution"><b>Distribution</b><div>{profile.distribution}</div></div>}
   </article>
 }

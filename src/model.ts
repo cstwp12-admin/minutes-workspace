@@ -9,6 +9,7 @@ export interface Participant { id: string; name: string; organization: string; r
 export interface ReviewComment { id: string; minuteItemId: string; text: string; resolved: boolean; createdAt: string }
 export interface AuditEvent { id: string; action: string; at: string }
 export interface ExportProfile {
+  templateId?: string
   organizationName: string
   projectName: string
   documentTitle: string

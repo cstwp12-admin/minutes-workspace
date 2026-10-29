@@ -4,6 +4,7 @@ import {
   VerticalAlign, WidthType, type ISectionOptions
 } from 'docx'
 import type { Block, ExportProfile, MeetingDocument } from './model'
+import { getExportTemplate, type ExportTemplate } from './exportTemplates'
 
 const PAGE_WIDTH = 9000
 const border = { style: BorderStyle.SINGLE, size: 1, color: 'AEB8B3' }
@@ -48,7 +49,7 @@ const technicalTable = (block: Extract<Block, {type:'metric_table'}>) => {
   return new Table({ rows:[header,...rows], width:{size:5200,type:WidthType.DXA}, columnWidths:widths, borders })
 }
 
-const minuteContent = (meeting: MeetingDocument, item: MeetingDocument['items'][number]) => {
+const minuteContent = (meeting: MeetingDocument, item: MeetingDocument['items'][number], template: ExportTemplate) => {
   const children: (Paragraph|Table)[] = [paragraph(item.title,{bold:true,size:19,after:80})]
   if (item.discussion) children.push(paragraph(item.discussion,{size:18}))
   item.blocks.forEach(block => {
@@ -58,20 +59,20 @@ const minuteContent = (meeting: MeetingDocument, item: MeetingDocument['items'][
       children.push(technicalTable(block))
     }
   })
-  if (item.decision) children.push(new Paragraph({ children:[text('Decision: ',{bold:true,size:18}),text(item.decision,{size:18})], spacing:{before:100,after:80}, border:{left:{style:BorderStyle.SINGLE,size:8,color:'173B2F',space:6}} }))
+  if (item.decision) children.push(new Paragraph({ children:[text(`${template.decisionLabel}: `,{bold:true,size:18}),text(item.decision,{size:18})], spacing:{before:100,after:80}, border:{left:{style:BorderStyle.SINGLE,size:8,color:'173B2F',space:6}} }))
   if (item.action) {
-    children.push(new Paragraph({ children:[text('Action: ',{bold:true,size:18}),text(item.action.requiredAction,{size:18})], spacing:{before:100,after:40}, border:{left:{style:BorderStyle.SINGLE,size:8,color:'173B2F',space:6}} }))
+    children.push(new Paragraph({ children:[text(`${template.actionLabel}: `,{bold:true,size:18}),text(item.action.requiredAction,{size:18})], spacing:{before:100,after:40}, border:{left:{style:BorderStyle.SINGLE,size:8,color:'173B2F',space:6}} }))
     children.push(new Paragraph({ children:[text('Due: ',{bold:true,size:18}),text(item.action.deadline || 'Not set',{size:18})], spacing:{after:80}, border:{left:{style:BorderStyle.SINGLE,size:8,color:'173B2F',space:6}} }))
   }
   return children
 }
 
-const minutesTable = (meeting: MeetingDocument) => {
+const minutesTable = (meeting: MeetingDocument, template: ExportTemplate) => {
   const widths = [700, 5700, 1400, 1200]
-  const header = new TableRow({ tableHeader:true, children:['No.','Subject / discussion / decision','Action by','Status'].map((value,index)=>cell([paragraph(value,{bold:true,size:17})],widths[index],true)) })
+  const header = new TableRow({ tableHeader:true, children:['No.',template.subjectHeading,template.ownerHeading,template.statusHeading].map((value,index)=>cell([paragraph(value,{bold:true,size:17})],widths[index],true)) })
   const rows = meeting.items.filter(item=>item.type==='minute').map(item=>new TableRow({ cantSplit:true, children:[
     cell([paragraph(item.itemRef,{bold:true,size:18})],widths[0]),
-    cell(minuteContent(meeting,item),widths[1]),
+    cell(minuteContent(meeting,item,template),widths[1]),
     cell([paragraph(item.action?.owner || item.owner,{size:18})],widths[2]),
     cell([paragraph(item.action?.status || item.status,{size:18})],widths[3])
   ] }))
@@ -102,6 +103,7 @@ const logoRun = (profile: ExportProfile) => {
 
 export const createMeetingDocxDocument = (meeting: MeetingDocument, profile: ExportProfile) => {
   const logo=logoRun(profile)
+  const template=getExportTemplate(profile.templateId)
   const children:(Paragraph|Table)[]=[
     new Paragraph({children:[...(logo?[logo]:[]),text(profile.organizationName || 'Meeting workspace',{bold:true,size:22})],spacing:{after:80},border:{bottom:{style:BorderStyle.SINGLE,size:18,color:profile.primaryColor.replace('#','')}}}),
     paragraph(profile.projectName,{size:17,color:'53625C',after:180}),
@@ -110,10 +112,10 @@ export const createMeetingDocxDocument = (meeting: MeetingDocument, profile: Exp
     paragraph(`${meeting.lifecycle==='finalized'?'FINAL':'DRAFT'} · REVISION ${meeting.revision ?? 1}`,{bold:true,size:17,color:meeting.lifecycle==='finalized'?'285442':'8A3838',after:160}),
     metadataTable(meeting),
   ]
-  if (meeting.participants?.length) children.push(new Paragraph({heading:HeadingLevel.HEADING_2,children:[text('Attendance',{bold:true,size:24})],spacing:{before:240,after:100}}),attendanceTable(meeting))
-  children.push(new Paragraph({heading:HeadingLevel.HEADING_2,children:[text('Meeting minutes',{bold:true,size:24})],spacing:{before:240,after:100}}),minutesTable(meeting))
+  if (template.showAttendance&&meeting.participants?.length) children.push(new Paragraph({heading:HeadingLevel.HEADING_2,children:[text('Attendance',{bold:true,size:24})],spacing:{before:240,after:100}}),attendanceTable(meeting))
+  children.push(new Paragraph({heading:HeadingLevel.HEADING_2,children:[text(template.sectionTitle,{bold:true,size:24})],spacing:{before:240,after:100}}),minutesTable(meeting,template))
   children.push(new Paragraph({heading:HeadingLevel.HEADING_2,children:[text('Issue and approval',{bold:true,size:24})],spacing:{before:260,after:100}}),approvalsTable(meeting))
-  if(profile.distribution) children.push(paragraph('Distribution',{bold:true,size:18,before:200,after:30}),paragraph(profile.distribution,{size:18}))
+  if(template.showDistribution&&profile.distribution) children.push(paragraph('Distribution',{bold:true,size:18,before:200,after:30}),paragraph(profile.distribution,{size:18}))
   const section:ISectionOptions={
     properties:{page:{margin:{top:900,right:900,bottom:900,left:900}}},
     headers:{default:new Header({children:[new Paragraph({children:[text(profile.documentTitle,{size:15,color:'65736D'}),text(`  |  ${meeting.meetingType} ${meeting.meetingNumber}`,{size:15,color:'65736D'})],alignment:AlignmentType.RIGHT})]})},
