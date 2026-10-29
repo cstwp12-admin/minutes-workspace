@@ -1,8 +1,9 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import App from './App'
+import PhaseOneApp from './PhaseOneApp'
 import { ErrorBoundary } from './ErrorBoundary'
 import './styles.css'
 import './responsive.css'
+import './dashboard.css'
 
-ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><ErrorBoundary><App /></ErrorBoundary></React.StrictMode>)
+ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><ErrorBoundary><PhaseOneApp /></ErrorBoundary></React.StrictMode>)

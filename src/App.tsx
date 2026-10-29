@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Archive, ChevronLeft, ChevronRight, CircleAlert, Download, FileCheck2, FileUp, MonitorPlay, PanelLeft, Search, Users } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Archive, ChevronLeft, ChevronRight, CircleAlert, Download, FileCheck2, FileUp, LayoutDashboard, MonitorPlay, PanelLeft, Search, Users } from 'lucide-react'
 import { sampleMeeting } from './fixtures'
 import { publicAppConfig } from './config'
 import { exportSnapshot, openActionCount, type MeetingDocument, type MinuteItem, type Status } from './model'
@@ -7,8 +7,8 @@ import { exportSnapshot, openActionCount, type MeetingDocument, type MinuteItem,
 type View = 'import'|'editor'|'presenter'|'actions'
 const statusClass = (s: Status) => `status status-${s.toLowerCase().replace(' ','-')}`
 
-function App(){
-  const [meeting,setMeeting]=useState<MeetingDocument>(sampleMeeting)
+function App({initialMeeting=sampleMeeting,onMeetingChange,onBack}:{initialMeeting?:MeetingDocument;onMeetingChange?:(meeting:MeetingDocument)=>void;onBack?:()=>void}){
+  const [meeting,setMeeting]=useState<MeetingDocument>(initialMeeting)
   const [view,setView]=useState<View>('editor')
   const [currentId,setCurrentId]=useState('m31')
   const [query,setQuery]=useState('')
@@ -21,10 +21,11 @@ function App(){
   const step=(d:number)=>{const idx=minutes.findIndex(i=>i.id===current.id);setCurrentId(minutes[Math.max(0,Math.min(minutes.length-1,idx+d))].id)}
   const exportJson=()=>{const blob=new Blob([exportSnapshot(meeting)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${meeting.id}-reviewed.json`;a.click();URL.revokeObjectURL(a.href);setToast('Canonical meeting package exported')}
   const simulateImport=(name:string)=>{setToast(`${name} staged for structured review`);setView('import')}
+  useEffect(()=>{const timer=setTimeout(()=>onMeetingChange?.({...meeting,updatedAt:new Date().toISOString()}),250);return()=>clearTimeout(timer)},[meeting,onMeetingChange])
 
   return <div className={`app ${view==='presenter'?'presenter-mode':''}`}>
     <a className="skip-link" href="#main-content">Skip to meeting content</a>
-    <header className="topbar"><div className="brand"><span className="brand-mark" aria-hidden="true">MW</span><div><strong>{publicAppConfig.productName}</strong><small>{publicAppConfig.productTagline}</small></div></div><div className="meeting-title"><span className="eyebrow">{meeting.meetingType} · No. {meeting.meetingNumber}</span><b>{meeting.title}</b></div><div className="top-actions"><button className="ghost" onClick={()=>setView('presenter')}><MonitorPlay size={17}/> Present</button><button className="primary" onClick={exportJson}><Download size={17}/> Export</button></div></header>
+    <header className="topbar"><div className="brand"><span className="brand-mark" aria-hidden="true">MW</span><div><strong>{publicAppConfig.productName}</strong><small>{publicAppConfig.productTagline}</small></div></div><div className="meeting-title"><span className="eyebrow">{meeting.meetingType} · No. {meeting.meetingNumber}</span><b>{meeting.title}</b></div><div className="top-actions">{onBack&&<button className="ghost" onClick={onBack}><LayoutDashboard size={17}/> Dashboard</button>}<button className="ghost" onClick={()=>setView('presenter')}><MonitorPlay size={17}/> Present</button><button className="primary" onClick={exportJson}><Download size={17}/> Export</button></div></header>
     <nav className="modebar" aria-label="Workspace views">{([['import','Import review',FileUp],['editor','Secretary',PanelLeft],['presenter','Presenter',MonitorPlay],['actions','Actions',Archive]] as const).map(([key,label,Icon])=><button key={key} className={view===key?'active':''} onClick={()=>setView(key)}><Icon size={16}/>{label}{key==='actions'&&<span className="count">{openActionCount(meeting.items)}</span>}</button>)}</nav>
     {view==='import'?<ImportReview meeting={meeting} simulateImport={simulateImport} approve={()=>{setMeeting(m=>({...m,importStatus:'approved'}));setToast('Import approved as revision 1');setView('editor')}}/>:
      view==='actions'?<ActionRegister meeting={meeting} setCurrentId={id=>{setCurrentId(id);setView('editor')}}/>:

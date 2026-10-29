@@ -2,7 +2,7 @@ import type { MeetingDocument } from './model'
 
 // Fictional public demo data. Do not add customer or project information here.
 export const sampleMeeting: MeetingDocument = {
-  id: 'northstar-delivery-04', title: 'Monthly Delivery Coordination Meeting', meetingType: 'Delivery Coordination', meetingNumber: '04', date: '14 October 2026', venue: 'Online', chair: 'Programme Lead', sourceFile: 'sample-meeting-minutes.pdf', sourceFormat: 'PDF', importStatus: 'review',
+  id: 'northstar-delivery-04', title: 'Monthly Delivery Coordination Meeting', meetingType: 'Delivery Coordination', meetingNumber: '04', date: '14 October 2026', venue: 'Online', chair: 'Programme Lead', sourceFile: 'sample-meeting-minutes.pdf', sourceFormat: 'PDF', importStatus: 'review', lifecycle: 'draft_minutes', updatedAt: '2026-10-29T14:00:00.000Z',
   items: [
     {id:'s1',itemRef:'1.0',depth:0,type:'section',title:'Opening and previous minutes',blocks:[],owner:'',status:'-',source:{page:2,table:1,row:2,confidence:.99,excerpt:'1.0 OPENING AND PREVIOUS MINUTES'}},
     {id:'m11',parentId:'s1',itemRef:'1.1',depth:1,type:'minute',title:'Previous minutes confirmed',blocks:[{type:'paragraph',text:'The previous meeting minutes were confirmed without amendment.'}],owner:'Information',status:'Closed',source:{page:2,table:1,row:3,confidence:.99,excerpt:'Previous minutes confirmed'}},
