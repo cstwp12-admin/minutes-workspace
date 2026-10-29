@@ -2,6 +2,7 @@ import type { FinalIssue, MeetingDocument } from './model'
 
 export function completenessIssues(meeting: MeetingDocument): string[] {
   const issues: string[] = []
+  if(meeting.importEvidence&&meeting.importStatus==='review') issues.push('Document import has not been approved')
   for (const [label,value] of [['Meeting title',meeting.title],['Meeting number',meeting.meetingNumber],['Meeting date',meeting.date],['Chair',meeting.chair],['Prepared by',meeting.preparedBy],['Checked by',meeting.checkedBy],['Approved by',meeting.approvedBy]]) {
     if (!value?.trim()) issues.push(`${label} is required`)
   }

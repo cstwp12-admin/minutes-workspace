@@ -41,7 +41,17 @@ const metadataTable = (meeting: MeetingDocument) => {
   ], widths)
 }
 
-const technicalTable = (block: Extract<Block, {type:'metric_table'}>) => {
+const technicalTable = (block: Extract<Block, {type:'metric_table'}>):Table => {
+  if(block.grid){
+    const count=Math.max(1,...block.grid.flat().map(cell=>cell.column+cell.colSpan))
+    const base=Math.floor(5200/count),widths=Array.from({length:count},(_,index)=>index===count-1?5200-base*(count-1):base)
+    const rows=block.grid.map(row=>new TableRow({children:row.map(source=>new TableCell({
+      columnSpan:source.colSpan,rowSpan:source.rowSpan,width:{size:widths.slice(source.column,source.column+source.colSpan).reduce((a,b)=>a+b,0),type:WidthType.DXA},
+      children:[...source.blocks.flatMap<Paragraph|Table>(child=>child.type==='paragraph'?[paragraph(child.text,{size:16})]:[technicalTable(child)]),new Paragraph({})],
+      margins:{top:70,bottom:70,left:70,right:70}
+    }))}))
+    return new Table({rows,width:{size:5200,type:WidthType.DXA},columnWidths:widths,borders})
+  }
   const count = Math.max(1, block.columns.length)
   const base = Math.floor(5200 / count)
   const widths = block.columns.map((_, index) => index === count - 1 ? 5200 - base * (count - 1) : base)
