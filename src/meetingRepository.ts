@@ -46,5 +46,5 @@ export function createBlankMeeting():MeetingDocument{
 export function duplicateMeeting(source:MeetingDocument):MeetingDocument{
   const now=new Date().toISOString(), map=new Map<string,string>()
   source.items.forEach(i=>map.set(i.id,uid()))
-  return {...structuredClone(source),id:uid(),title:`${source.title} (copy)`,meetingNumber:`${source.meetingNumber}-copy`,lifecycle:'draft_agenda',updatedAt:now,archivedAt:undefined,items:source.items.map(i=>({...structuredClone(i),id:map.get(i.id)!,parentId:i.parentId?map.get(i.parentId):undefined,action:i.action?{...structuredClone(i.action),id:uid(),status:i.action.status==='Closed'?'Closed':'Open'}:undefined}))}
+  return {...structuredClone(source),id:uid(),title:`${source.title} (copy)`,meetingNumber:`${source.meetingNumber}-copy`,lifecycle:'draft_agenda',revision:1,finalIssues:[],reviewComments:[],auditEvents:[],checkedBy:'',approvedBy:'',updatedAt:now,archivedAt:undefined,items:source.items.map(i=>({...structuredClone(i),id:map.get(i.id)!,parentId:i.parentId?map.get(i.parentId):undefined,action:i.action?{...structuredClone(i.action),id:uid(),status:i.action.status==='Closed'?'Closed':'Open'}:undefined}))}
 }

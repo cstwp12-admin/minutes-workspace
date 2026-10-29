@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type SetStateAction } from 'react'
 import { Archive, ChevronLeft, ChevronRight, CircleAlert, ClipboardCheck, ClipboardList, Download, FileCheck2, FileOutput, FileUp, LayoutDashboard, MonitorPlay, PanelLeft, Radio, Search, Users } from 'lucide-react'
 import { sampleMeeting } from './fixtures'
 import { publicAppConfig } from './config'
@@ -12,7 +12,12 @@ type View = 'prepare'|'live'|'review'|'import'|'editor'|'presenter'|'actions'|'e
 const statusClass = (s: Status) => `status status-${s.toLowerCase().replace(' ','-')}`
 
 function App({initialMeeting=sampleMeeting,onMeetingChange,onBack}:{initialMeeting?:MeetingDocument;onMeetingChange?:(meeting:MeetingDocument)=>void;onBack?:()=>void}){
-  const [meeting,setMeeting]=useState<MeetingDocument>(initialMeeting)
+  const [meeting,setMeetingState]=useState<MeetingDocument>(initialMeeting)
+  const setMeeting=(update:SetStateAction<MeetingDocument>)=>setMeetingState(previous=>{
+    const next=typeof update==='function'?update(previous):update
+    if(previous.lifecycle==='finalized' && !(next.lifecycle==='draft_minutes' && next.revision===(previous.revision??1)+1)) return previous
+    return next
+  })
   const [view,setView]=useState<View>('editor')
   const [currentId,setCurrentId]=useState('m31')
   const [query,setQuery]=useState('')
@@ -31,6 +36,7 @@ function App({initialMeeting=sampleMeeting,onMeetingChange,onBack}:{initialMeeti
     <a className="skip-link" href="#main-content">Skip to meeting content</a>
     <header className="topbar"><div className="brand"><span className="brand-mark" aria-hidden="true">MW</span><div><strong>{publicAppConfig.productName}</strong><small>{publicAppConfig.productTagline}</small></div></div><div className="meeting-title"><span className="eyebrow">{meeting.meetingType} · No. {meeting.meetingNumber}</span><b>{meeting.title}</b></div><div className="top-actions">{onBack&&<button className="ghost" onClick={onBack}><LayoutDashboard size={17}/> Dashboard</button>}<button className="ghost" onClick={()=>setView('presenter')}><MonitorPlay size={17}/> Present</button><button className="primary" onClick={()=>setView('export')}><Download size={17}/> Export</button></div></header>
     <nav className="modebar" aria-label="Workspace views">{([['prepare','Prepare',ClipboardList],['live','Live meeting',Radio],['review','Review',ClipboardCheck],['import','Import review',FileUp],['editor','Secretary',PanelLeft],['presenter','Presenter',MonitorPlay],['actions','Actions',Archive],['export','Export',FileOutput]] as const).map(([key,label,Icon])=><button key={key} className={view===key?'active':''} onClick={()=>setView(key)}><Icon size={16}/>{label}{key==='actions'&&<span className="count">{openActionCount(meeting.items)}</span>}</button>)}</nav>
+    {meeting.lifecycle==='finalized'&&<div className="final-lock-note" role="status">Final issue R{meeting.revision??1} is read-only. Open Review → Create amendment to make changes.</div>}
     {view==='prepare'?<PreparationView meeting={meeting} onChange={setMeeting}/>:
      view==='live'?<LiveMeetingView meeting={meeting} onChange={setMeeting}/>:
      view==='review'?<ReviewView meeting={meeting} onChange={setMeeting}/>:
