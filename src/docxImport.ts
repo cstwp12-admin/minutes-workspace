@@ -113,7 +113,7 @@ export function parseDocxXml(xml:string,filename='meeting.docx'):MeetingDocument
     const candidate=[...items].reverse().find(parent=>parent.type==='section'&&parent.depth<item.depth || !section&&ref.startsWith(parent.itemRef+'.'))
     if(candidate)item.parentId=candidate.id
     if(!section&&(actionText||meaningfulOwner))item.action={id:uid(),actionRef:`ACT-${ref}`,requiredAction:actionText||blocks.filter(b=>b.type==='paragraph').map(b=>b.text).join('\n')||title,owner,deadline,status:['Info','-'].includes(status)?'Open':status}
-    if(item.action&&!deadline)warnings.add(`${ref}: verify the action deadline; no unambiguous ISO date was found.`)
+    if(item.action&&!deadline)warnings.add(`${ref}: verify the action deadline; no unambiguous date was found.`)
     items.push(item);last=item
     return item
   }
@@ -204,6 +204,7 @@ export function parseDocxXml(xml:string,filename='meeting.docx'):MeetingDocument
   const title=metadata.title||paragraphs.find(p=>/meeting|minutes/i.test(p))||filename.replace(/\.docx$/i,'')
   const meetingNumber=metadata.meetingNumber||title.match(/(?:no\.?|number)\s*[:#.]?\s*(\d+)/i)?.[1]||''
   warnings.add('Check all metadata, item boundaries, owners and inferred actions before approval. Original page layout, headers, footers and contact columns are retained only in your original file or source evidence.')
+  warnings.add('Owner-based actions are suggestions. Edit or remove inferred follow-ups during review if the source does not require an action.')
   const date=normalizedDate(metadata.date||'')
   if(metadata.date&&!date)warnings.add('Meeting date could not be normalized without guessing. Enter the date after checking source evidence.')
   const meeting:MeetingDocument={id:uid(),title,meetingType:metadata.meetingType||'Imported meeting',meetingNumber,date,venue:metadata.venue||'',chair:metadata.chair||'',sourceFile:filename,sourceFormat:'DOCX',importStatus:'review',lifecycle:'draft_minutes',revision:1,updatedAt:new Date().toISOString(),participants,items,importEvidence:{tables,paragraphs,warnings:[...warnings]}}
