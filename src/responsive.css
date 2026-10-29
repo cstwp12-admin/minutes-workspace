@@ -1,0 +1,27 @@
+/* Phase 0: responsive and accessible public preview */
+html{scroll-behavior:smooth}
+body{min-width:320px}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible{outline:3px solid #f3a27e;outline-offset:2px}
+.skip-link{position:fixed;left:12px;top:-60px;z-index:50;background:#fff;color:var(--green);padding:10px 14px;border-radius:7px;box-shadow:0 4px 16px #0002}
+.skip-link:focus{top:10px}
+.fatal-error{min-height:100vh;display:grid;place-content:center;justify-items:center;text-align:center;padding:28px}
+.fatal-error h1{font:700 30px Manrope;margin-bottom:8px}
+.fatal-error p{color:var(--muted);max-width:440px}
+@media(max-width:900px){
+  .topbar{height:auto;min-height:112px;grid-template-columns:1fr auto;padding:14px 16px;gap:12px}
+  .meeting-title{grid-column:1/-1;grid-row:2;text-align:left}
+  .top-actions{grid-column:2;grid-row:1}.top-actions button{font-size:0}
+  .modebar{justify-content:flex-start;overflow-x:auto}.modebar button{padding:0 13px;white-space:nowrap}
+  .workspace,.presenter-mode .workspace{height:auto;min-height:calc(100vh - 160px);display:grid;grid-template-columns:1fr}
+  .agenda{border-right:0;border-bottom:1px solid var(--line);max-height:340px}
+  .canvas,.presenter-mode .canvas{padding:24px 18px}.inspector{border-left:0;border-top:1px solid var(--line)}
+  .item-heading{grid-template-columns:52px 1fr;gap:12px}.item-heading>.status{grid-column:2}
+  .item-heading h1,.presenter-mode .item-heading h1{font-size:27px}.body-copy,.presenter-mode .body-copy{font-size:16px}
+  .import-page,.actions-page{padding:22px 14px}.import-hero,.review-grid{grid-template-columns:1fr}.paper{margin:12px;padding:18px 12px}.issues{grid-column:auto}
+  .page-heading{align-items:flex-start;gap:15px}.summary-cards{grid-template-columns:1fr 1fr}.action-table{overflow-x:auto}.action-row{min-width:760px}.field-row{grid-template-columns:1fr}
+}
+@media(max-width:540px){
+  .brand small{display:none}.top-actions{gap:5px}.top-actions button{padding:9px}.modebar button{font-size:12px}
+  .summary-cards{grid-template-columns:1fr}.item-heading{grid-template-columns:44px 1fr}.item-number{width:44px;height:44px;border-radius:12px}
+  .canvas-meta{gap:10px;align-items:flex-start}.confidence{white-space:nowrap}.pager button{font-size:12px}.import-hero h1,.page-heading h1{font-size:31px}
+}
