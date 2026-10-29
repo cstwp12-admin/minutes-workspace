@@ -9,7 +9,7 @@ export interface Participant { id: string; name: string; organization: string; r
 export interface ActionItem { id: string; actionRef: string; requiredAction: string; owner: string; deadline: string; status: Status }
 export interface MinuteItem {
   id: string; parentId?: string; itemRef: string; depth: number; type: 'section' | 'minute';
-  title: string; blocks: Block[]; owner: string; status: Status; action?: ActionItem; source: SourceAnchor
+  title: string; blocks: Block[]; owner: string; status: Status; action?: ActionItem; source: SourceAnchor; discussion?: string; decision?: string; outcome?: 'pending'|'discussed'|'deferred'|'skipped'; allocatedMinutes?: number
 }
 export interface MeetingDocument { id: string; title: string; meetingType: string; meetingNumber: string; date: string; venue: string; chair: string; sourceFile: string; sourceFormat: 'DOCX'|'PDF'; importStatus: 'review'|'approved'; lifecycle: MeetingLifecycle; updatedAt: string; archivedAt?: string; participants?: Participant[]; items: MinuteItem[] }
 
