@@ -1,4 +1,5 @@
-import { Download, FileJson, FileSpreadsheet, ImagePlus, Printer, ShieldCheck, Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { Download, FileJson, FileSpreadsheet, FileType2, ImagePlus, Printer, ShieldCheck, Trash2 } from 'lucide-react'
 import { exportSnapshot, type ExportProfile, type MeetingDocument } from './model'
 
 export const defaultExportProfile: ExportProfile = {
@@ -39,6 +40,7 @@ const printableStyles = `
 `
 
 export function ExportView({ meeting, onChange, notify }: { meeting: MeetingDocument; onChange: (meeting: MeetingDocument) => void; notify: (message: string) => void }) {
+  const [generatingWord,setGeneratingWord]=useState(false)
   const profile = { ...defaultExportProfile, ...meeting.exportProfile }
   const updateProfile = (patch: Partial<ExportProfile>) => onChange({ ...meeting, exportProfile: { ...profile, ...patch } })
   const baseName = safeName(`${meeting.meetingType}-${meeting.meetingNumber}`)
@@ -54,6 +56,12 @@ export function ExportView({ meeting, onChange, notify }: { meeting: MeetingDocu
     const reader = new FileReader(); reader.onload = () => updateProfile({ logoDataUrl: String(reader.result) }); reader.readAsDataURL(file)
   }
   const printPdf = () => { notify('Use the print dialog to save as PDF'); window.setTimeout(() => window.print(), 100) }
+  const exportWord = async () => {
+    setGeneratingWord(true)
+    try { const {generateMeetingDocx}=await import('./docxExport'); download(await generateMeetingDocx(meeting,profile),`${baseName}-${meeting.lifecycle==='finalized'?'final':'draft'}.docx`,'application/vnd.openxmlformats-officedocument.wordprocessingml.document'); notify('Editable Word document exported') }
+    catch { notify('Word export could not be generated') }
+    finally { setGeneratingWord(false) }
+  }
   return <main className="export-page" id="main-content">
     <section className="export-controls">
       <div><span className="eyebrow">Phase 5 · Official output</span><h1>Publish-ready minutes</h1><p>Set document identity at runtime. Nothing here is embedded in the public app source.</p></div>
@@ -67,12 +75,13 @@ export function ExportView({ meeting, onChange, notify }: { meeting: MeetingDocu
         <div className="logo-control"><span>Document logo (optional)</span><div>{profile.logoDataUrl&&<img src={profile.logoDataUrl} alt="Current document logo"/>}<label className="secondary-button"><ImagePlus size={16}/> Choose logo<input type="file" accept="image/png,image/jpeg,image/svg+xml" onChange={e=>uploadLogo(e.target.files?.[0])}/></label>{profile.logoDataUrl&&<button className="icon-button" onClick={()=>updateProfile({logoDataUrl:undefined})} aria-label="Remove logo"><Trash2 size={16}/></button>}</div></div>
       </div>
       <div className="export-actions">
+        <button className="primary" onClick={exportWord} disabled={generatingWord}><FileType2 size={17}/> {generatingWord?'Building Word…':'Editable Word'}</button>
         <button className="primary" onClick={printPdf}><Printer size={17}/> Print / Save PDF</button>
         <button onClick={exportHtml}><Download size={17}/> Standalone HTML</button>
         <button onClick={()=>{download(exportActionsCsv(meeting),`${baseName}-actions.csv`,'text/csv;charset=utf-8');notify('Action register exported')}}><FileSpreadsheet size={17}/> Action CSV</button>
         <button onClick={()=>{download(exportSnapshot(meeting),`${baseName}-backup.json`,'application/json');notify('Meeting backup exported')}}><FileJson size={17}/> Data backup</button>
       </div>
-      <p className="export-hint">PDF uses your browser’s print dialog for dependable A4 pagination. Editable DOCX is the next export increment.</p>
+      <p className="export-hint">Word export creates a genuine editable DOCX with A4 pages, repeating table headers, technical tables and page numbering. Raster logos (PNG/JPG) are included in Word; SVG remains available in HTML/PDF.</p>
     </section>
     <section className="document-preview" aria-label="Official minutes preview"><div className="preview-label">A4 preview · {meeting.lifecycle==='finalized'?'Final issue':'Draft issue'}</div>
       <OfficialDocument meeting={meeting} profile={profile}/>
