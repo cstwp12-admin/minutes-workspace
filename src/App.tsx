@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Archive, ChevronLeft, ChevronRight, CircleAlert, Download, FileCheck2, FileUp, LayoutDashboard, MonitorPlay, PanelLeft, Search, Users } from 'lucide-react'
+import { Archive, ChevronLeft, ChevronRight, CircleAlert, ClipboardList, Download, FileCheck2, FileUp, LayoutDashboard, MonitorPlay, PanelLeft, Search, Users } from 'lucide-react'
 import { sampleMeeting } from './fixtures'
 import { publicAppConfig } from './config'
+import { PreparationView } from './PreparationView'
 import { exportSnapshot, openActionCount, type MeetingDocument, type MinuteItem, type Status } from './model'
 
-type View = 'import'|'editor'|'presenter'|'actions'
+type View = 'prepare'|'import'|'editor'|'presenter'|'actions'
 const statusClass = (s: Status) => `status status-${s.toLowerCase().replace(' ','-')}`
 
 function App({initialMeeting=sampleMeeting,onMeetingChange,onBack}:{initialMeeting?:MeetingDocument;onMeetingChange?:(meeting:MeetingDocument)=>void;onBack?:()=>void}){
@@ -26,8 +27,9 @@ function App({initialMeeting=sampleMeeting,onMeetingChange,onBack}:{initialMeeti
   return <div className={`app ${view==='presenter'?'presenter-mode':''}`}>
     <a className="skip-link" href="#main-content">Skip to meeting content</a>
     <header className="topbar"><div className="brand"><span className="brand-mark" aria-hidden="true">MW</span><div><strong>{publicAppConfig.productName}</strong><small>{publicAppConfig.productTagline}</small></div></div><div className="meeting-title"><span className="eyebrow">{meeting.meetingType} · No. {meeting.meetingNumber}</span><b>{meeting.title}</b></div><div className="top-actions">{onBack&&<button className="ghost" onClick={onBack}><LayoutDashboard size={17}/> Dashboard</button>}<button className="ghost" onClick={()=>setView('presenter')}><MonitorPlay size={17}/> Present</button><button className="primary" onClick={exportJson}><Download size={17}/> Export</button></div></header>
-    <nav className="modebar" aria-label="Workspace views">{([['import','Import review',FileUp],['editor','Secretary',PanelLeft],['presenter','Presenter',MonitorPlay],['actions','Actions',Archive]] as const).map(([key,label,Icon])=><button key={key} className={view===key?'active':''} onClick={()=>setView(key)}><Icon size={16}/>{label}{key==='actions'&&<span className="count">{openActionCount(meeting.items)}</span>}</button>)}</nav>
-    {view==='import'?<ImportReview meeting={meeting} simulateImport={simulateImport} approve={()=>{setMeeting(m=>({...m,importStatus:'approved'}));setToast('Import approved as revision 1');setView('editor')}}/>:
+    <nav className="modebar" aria-label="Workspace views">{([['prepare','Prepare',ClipboardList],['import','Import review',FileUp],['editor','Secretary',PanelLeft],['presenter','Presenter',MonitorPlay],['actions','Actions',Archive]] as const).map(([key,label,Icon])=><button key={key} className={view===key?'active':''} onClick={()=>setView(key)}><Icon size={16}/>{label}{key==='actions'&&<span className="count">{openActionCount(meeting.items)}</span>}</button>)}</nav>
+    {view==='prepare'?<PreparationView meeting={meeting} onChange={setMeeting}/>:
+     view==='import'?<ImportReview meeting={meeting} simulateImport={simulateImport} approve={()=>{setMeeting(m=>({...m,importStatus:'approved'}));setToast('Import approved as revision 1');setView('editor')}}/>:
      view==='actions'?<ActionRegister meeting={meeting} setCurrentId={id=>{setCurrentId(id);setView('editor')}}/>:
      <main className="workspace" id="main-content">
       <aside className="agenda"><div className="agenda-head"><div><span className="eyebrow">Agenda</span><b>{meeting.items.length} structured items</b></div><button aria-label="Participants"><Users size={18}/></button></div><label className="search"><Search size={16}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Find item or reference"/></label><div className="filters">{(['All','Open','Ongoing','Overdue','Closed'] as const).map(s=><button className={filter===s?'selected':''} onClick={()=>setFilter(s)} key={s}>{s}</button>)}</div><div className="agenda-list">{shown.map(item=><button key={item.id} className={`agenda-item ${item.id===current.id?'current':''} ${item.type==='section'?'section':''}`} style={{paddingLeft:14+item.depth*18}} onClick={()=>item.type==='minute'&&setCurrentId(item.id)}><span className="ref">{item.itemRef}</span><span className="agenda-label">{item.title}</span>{item.type==='minute'&&<span className={statusClass(item.status)}>{item.status}</span>}</button>)}</div></aside>

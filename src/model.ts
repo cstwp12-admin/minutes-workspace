@@ -5,12 +5,13 @@ export type Block =
   | { type: 'metric_table'; title: string; columns: string[]; rows: string[][] }
 
 export interface SourceAnchor { page?: number; table: number; row: number; confidence: number; excerpt: string }
+export interface Participant { id: string; name: string; organization: string; role: string; attendance: 'expected'|'confirmed'|'apology' }
 export interface ActionItem { id: string; actionRef: string; requiredAction: string; owner: string; deadline: string; status: Status }
 export interface MinuteItem {
   id: string; parentId?: string; itemRef: string; depth: number; type: 'section' | 'minute';
   title: string; blocks: Block[]; owner: string; status: Status; action?: ActionItem; source: SourceAnchor
 }
-export interface MeetingDocument { id: string; title: string; meetingType: string; meetingNumber: string; date: string; venue: string; chair: string; sourceFile: string; sourceFormat: 'DOCX'|'PDF'; importStatus: 'review'|'approved'; lifecycle: MeetingLifecycle; updatedAt: string; archivedAt?: string; items: MinuteItem[] }
+export interface MeetingDocument { id: string; title: string; meetingType: string; meetingNumber: string; date: string; venue: string; chair: string; sourceFile: string; sourceFormat: 'DOCX'|'PDF'; importStatus: 'review'|'approved'; lifecycle: MeetingLifecycle; updatedAt: string; archivedAt?: string; participants?: Participant[]; items: MinuteItem[] }
 
 export const childrenOf = (items: MinuteItem[], id?: string) => items.filter(i => i.parentId === id)
 export const openActionCount = (items: MinuteItem[]) => items.filter(i => i.action && !['Closed','Info','-'].includes(i.action.status)).length
