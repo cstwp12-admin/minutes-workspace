@@ -1,5 +1,6 @@
 import { strFromU8, unzipSync } from 'fflate'
 import type { Block, ImportEvidence, MeetingDocument, MinuteItem, SourceCell, Status } from './model'
+import { wordNumberingLabels, type NumberLabel } from './wordNumbering'
 
 const W='http://schemas.openxmlformats.org/wordprocessingml/2006/main'
 const children=(element:Element,name:string)=>Array.from(element.children).filter(child=>child.namespaceURI===W&&child.localName===name)
@@ -8,7 +9,7 @@ const attr=(element:Element|undefined,name:string)=>element?.getAttributeNS(W,na
 const clean=(value:string)=>value.replace(/\s+/g,' ').trim()
 const uid=()=>crypto.randomUUID()
 
-function paragraphText(element:Element):string {
+function paragraphText(element:Element,labels?:Map<Element,NumberLabel>):string {
   const visit=(node:Element):string=>{
     if(node.namespaceURI===W&&['del','moveFrom','instrText','delText'].includes(node.localName))return ''
     if(node.namespaceURI===W&&node.localName==='t')return node.textContent??''
@@ -16,10 +17,11 @@ function paragraphText(element:Element):string {
     if(node.namespaceURI===W&&['br','cr'].includes(node.localName))return '\n'
     return Array.from(node.children).map(visit).join('')
   }
-  return visit(element).trim()
+  const raw=visit(element).trim(),label=labels?.get(element)?.text
+  return label?`${label} ${raw}`.trim():raw
 }
 
-function readTable(element:Element,warnings:Set<string>,depth=0):SourceCell[][] {
+function readTable(element:Element,warnings:Set<string>,depth=0,labels?:Map<Element,NumberLabel>):SourceCell[][] {
   if(depth>8)throw new Error('This document contains more than eight nested table levels. Simplify the table structure before importing.')
   const grid:SourceCell[][]=[], active=new Map<number,SourceCell>()
   children(element,'tr').forEach(row=>{
@@ -32,8 +34,8 @@ function readTable(element:Element,warnings:Set<string>,depth=0):SourceCell[][] 
       const merge=props?descendants(props,'vMerge')[0]:undefined
       const blocks:Block[]=Array.from(tc.children).flatMap<Block>(child=>{
         if(child.namespaceURI!==W)return []
-        if(child.localName==='p'){const value=paragraphText(child);return value?[{type:'paragraph' as const,text:value}]:[]}
-        if(child.localName==='tbl')return [tableBlock(readTable(child,warnings,depth+1),'Embedded technical table')]
+        if(child.localName==='p'){const value=paragraphText(child,labels);return value?[{type:'paragraph' as const,text:value}]:[]}
+        if(child.localName==='tbl')return [tableBlock(readTable(child,warnings,depth+1,labels),'Embedded technical table')]
         return []
       })
       const text=blocks.filter(b=>b.type==='paragraph').map(b=>b.text).join('\n')
@@ -85,18 +87,20 @@ function normalizedDate(value:string):string{
   return date.getUTCFullYear()===year&&date.getUTCMonth()===month-1&&date.getUTCDate()===day?date.toISOString().slice(0,10):''
 }
 
-export function parseDocxXml(xml:string,filename='meeting.docx'):MeetingDocument {
+export function parseDocxXml(xml:string,filename='meeting.docx',numberingXml?:string,stylesXml?:string):MeetingDocument {
   if(xml.length>8_000_000||/<!DOCTYPE|<!ENTITY/i.test(xml))throw new Error('The document XML is too large or uses unsupported entity declarations.')
   const parsed=new DOMParser().parseFromString(xml,'application/xml')
   if(parsed.getElementsByTagName('parsererror').length)throw new Error('The Word document contains invalid XML.')
   const body=parsed.getElementsByTagNameNS(W,'body')[0]
   if(!body)throw new Error('No Word document body was found.')
   if(body.getElementsByTagName('*').length>120_000)throw new Error('The document is too complex for this import. Split it into smaller files.')
-  const warnings=new Set<string>()
+  const numbering=wordNumberingLabels(body,numberingXml,stylesXml)
+  const warnings=new Set<string>(numbering.warnings)
+  const labelled=[...numbering.labels.entries()]
+  const nextLevel=new Map(labelled.map(([paragraph],index)=>[paragraph,labelled[index+1]?.[1].level??0]))
   const tables:ImportEvidence['tables']=[], paragraphs:string[]=[], items:MinuteItem[]=[], participants:NonNullable<MeetingDocument['participants']>=[]
   const metadata:Record<string,string>={}
   let last:MinuteItem|undefined
-  if(descendants(body,'numPr').length)warnings.add('Automatic Word list numbering may need reference correction; text is retained for review.')
   if(descendants(body,'drawing').length||descendants(body,'pict').length)warnings.add('Images and drawings are not imported. Retain the original file for visual evidence.')
   if(descendants(body,'ins').length||descendants(body,'del').length)warnings.add('Tracked changes were read as accepted text: insertions included, deletions excluded. Check against the original.')
   const readMetadata=(key:string,value:string)=>{
@@ -121,38 +125,51 @@ export function parseDocxXml(xml:string,filename='meeting.docx'):MeetingDocument
     for(const block of blocks){
       if(block.type!=='paragraph')continue
       for(const line of block.text.split('\n')){
-        const match=line.trim().match(/^([a-z])\)\s+(.+)$/i)
+        const match=line.trim().match(/^(?:\()?([a-z]|[ivxlcdm]{2,8})[).]\s+(.+)$/i)
         if(!match)continue
-        const ref=`${parent.itemRef}(${match[1].toLowerCase()})`
+        const baseRef=`${parent.itemRef}(${match[1].toLowerCase()})`
+        let ref=baseRef,occurrence=2
+        while(items.some(item=>item.itemRef===ref))ref=`${baseRef}-${occurrence++}`
+        if(ref!==baseRef)warnings.add(`${ref}: this list label repeats within ${parent.itemRef}; a temporary unique suffix was added. Verify its reference and parent.`)
         const child=addItem(ref,match[2].slice(0,120),[{type:'paragraph',text:match[2]}],parent.owner,parent.status,parent.source.table,parent.source.row)
         child.parentId=parent.id;child.depth=parent.depth+1;child.source.confidence=.55
+        child.source.excerpt=`${match[1]}) ${match[2]}`.slice(0,600)
         warnings.add(`${ref}: inferred subaction; verify its owner, deadline and reference.`)
       }
     }
+    last=parent
   }
   for(const element of Array.from(body.children)){
     if(element.namespaceURI!==W)continue
     if(element.localName==='p'){
-      const value=paragraphText(element)
+      const value=paragraphText(element,numbering.labels)
       if(!value)continue
       paragraphs.push(value)
       const pair=value.match(/^([^:]{2,35}):\s*(.+)$/s)
       if(pair)readMetadata(pair[1],pair[2])
-      const numbered=value.match(/^(\d+(?:\.\d+)+(?:\([a-z]\))?)\.?\s+(.+)$/is)
-      if(numbered)addItem(numbered[1],numbered[2].slice(0,140),[{type:'paragraph',text:numbered[2]}],'','-',0,paragraphs.length)
+      const numbered=value.match(/^(\d+(?:\.\d+)+(?:\([a-z]\))?)\.?\s+(.+)$/is)??(numbering.labels.has(element)?value.match(/^(\d+)\.?\s+(.+)$/s):null)
+      if(numbered){
+        const label=numbering.labels.get(element)
+        const item=addItem(numbered[1],numbered[2].split('\n')[0].slice(0,140),[{type:'paragraph',text:numbered[2]}],'','-',0,paragraphs.length,!!label&&label.level<(nextLevel.get(element)??0))
+        if(label)item.depth=label.level
+      }else if(last&&last.source.table===0&&!pair){
+        const sub=value.match(/^(?:\()?([a-z]|[ivxlcdm]{2,8})[).]\s+(.+)$/i)
+        if(sub)extractSubactions(last,[{type:'paragraph',text:value}])
+        else last.blocks.push({type:'paragraph',text:value})
+      }
       continue
     }
     if(element.localName!=='tbl')continue
-    const index=tables.length+1, grid=readTable(element,warnings)
+    const index=tables.length+1, grid=readTable(element,warnings,0,numbering.labels)
     tables.push({index,grid})
     let mapping:Record<string,number>|undefined, attendance:Record<string,number>|undefined, recognized=false
     for(let ri=0;ri<grid.length;ri++){
       const row=grid[ri], mappingForRow:Record<string,number>={}
       for(const cell of row){
         const name=normalize(cell.text)
-        if(['no','number','item','ref','reference','itemno'].includes(name))mappingForRow.ref=cell.column
+        if(['no','number','item','ref','reference','itemno','itemref'].includes(name))mappingForRow.ref=cell.column
         if(/^(subject|description|discussion|matter|workstream|technicalitem|topic)/.test(name))mappingForRow.subject=cell.column
-        if(/^(actionby|owner|responsible|executiveowner|lead)$/.test(name))mappingForRow.owner=cell.column
+        if(/^(actionby|action|owner|responsible|executiveowner|lead)$/.test(name))mappingForRow.owner=cell.column
         if(/^(status|state|disposition|progress)$/.test(name))mappingForRow.status=cell.column
         if(/^(requiredaction|nextaction|commitment|followup)$/.test(name))mappingForRow.action=cell.column
         if(/^(due|deadline|duedate)$/.test(name))mappingForRow.deadline=cell.column
@@ -218,14 +235,17 @@ export async function importDocx(file:File):Promise<MeetingDocument>{
   if(!/\.docx$/i.test(file.name))throw new Error('Choose a DOCX document. PDF import is coming in the next increment.')
   if(file.size>15_000_000)throw new Error('Choose a DOCX smaller than 15 MB.')
   let documentBytes:Uint8Array|undefined
+  let numberingBytes:Uint8Array|undefined,stylesBytes:Uint8Array|undefined
   try{
     const entries=unzipSync(new Uint8Array(await file.arrayBuffer()),{filter:entry=>{
-      if(entry.name!=='word/document.xml')return false
-      if(entry.originalSize>8_000_000)throw new Error('Document content exceeds the 8 MB import limit.')
+      if(!['word/document.xml','word/numbering.xml','word/styles.xml'].includes(entry.name))return false
+      const limit=entry.name==='word/document.xml'?8_000_000:entry.name==='word/numbering.xml'?1_000_000:2_000_000
+      if(entry.originalSize>limit)throw new Error('Word content or numbering exceeds the import limit.')
       return true
     }})
     documentBytes=entries['word/document.xml']
+    numberingBytes=entries['word/numbering.xml'];stylesBytes=entries['word/styles.xml']
   }catch{throw new Error('This file could not be read as a supported DOCX. It may be corrupt, encrypted or too large.')}
   if(!documentBytes)throw new Error('This archive has no Word document content.')
-  return parseDocxXml(strFromU8(documentBytes),file.name)
+  return parseDocxXml(strFromU8(documentBytes),file.name,numberingBytes?strFromU8(numberingBytes):undefined,stylesBytes?strFromU8(stylesBytes):undefined)
 }

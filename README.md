@@ -37,7 +37,15 @@ The included Northstar programme is fictional demonstration data. Real documents
 
 Choose **Import DOCX / PDF** in the meeting library or **Import review** in a meeting. Review the extracted details, source evidence and item hierarchy; correct text, references, owners and deadlines; remove or add inferred actions. Acknowledge the review and approve to save a separate meeting. Original meetings are not replaced.
 
-The importer reads explicit numbered rows from common minutes tables. Unmatched tables and body paragraphs remain in source evidence. Automatic Word list numbering, unusual layouts and ambiguous rows require review. Images, original pagination, headers and footers are not reproduced. Retain the original file for visual comparison. Uploaded files are limited to 15 MB, document XML to 8 MB, and deeply nested or oversized tables are rejected.
+The importer reads explicit numbered rows and common automatic Word list numbering, including inherited paragraph styles, decimal levels, letter and Roman labels, start overrides and restarts. Unsupported numbering formats, unusual layouts and ambiguous rows remain flagged for review. Repeated inferred list labels receive a temporary unique suffix and retain their original list text in source evidence. Images, original pagination, headers and footers are not reproduced. Retain the original file for visual comparison. Uploaded files are limited to 15 MB, document XML to 8 MB, numbering to 1 MB, and styles to 2 MB.
+
+## Import correction tools
+
+- Use **Correct item boundaries and order** to move an item with its children, split between content blocks, or merge with the preceding minute. Splitting keeps an existing action on the first item; merging refuses to discard either of two actions.
+- Change **Parent item** to correct nesting. Descendant depths update together.
+- Use **Map source columns or attach continuation rows** to choose a source table, row range and field columns. Rebuild that table’s reconstructed items, append mapped items, or attach the raw rows to the selected minute.
+- **Undo correction** restores the previous draft, including technical content and hierarchy, for the latest 20 edits. This history exists during the current staged review.
+- Approval requires unique non-empty references, item titles and valid parent order. Inferred actions and dates still need human review. Source evidence is retained separately from these corrections.
 
 ## Searchable PDF import
 

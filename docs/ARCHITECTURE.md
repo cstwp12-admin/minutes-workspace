@@ -27,6 +27,10 @@ Every server-side transition will eventually create an append-only audit event. 
 
 The DOCX parser loads only the main document XML from a bounded ZIP archive and constructs text and table data. Imported content is rendered through React rather than inserted as HTML. External relationships, scripts and macros are not executed.
 
+DOCX list reconstruction also reads bounded numbering and style parts. Labels are calculated once in document order to avoid advancing counters twice when a table is revisited. Supported definitions include style inheritance, list instances, level start overrides and common restart rules; unsupported formats produce review notes.
+
+Import corrections are pure transformations of the staged record. Source evidence is not rewritten. Operations preserve technical blocks, track related source anchors and create review audit events. The review UI keeps the latest 20 prior draft states for Undo. Split operations do not duplicate actions, and conflicting actions prevent an automatic merge.
+
 Import staging owns an independent draft until approval. Each imported record keeps extracted table grids, body paragraphs, original references and review notes in its local source evidence. Rich table cells carry column positions and row/column spans alongside recursively nested content blocks. The preview and Word export consume the same cell model.
 
 Pattern confidence values are review hints, not calibrated accuracy measurements. Word pages are not inferred from XML.
