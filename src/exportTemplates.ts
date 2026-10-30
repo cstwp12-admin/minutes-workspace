@@ -1,7 +1,12 @@
+import type { ExportProfile } from './model'
+export const documentSections=['attendance','minutes','actions','decisions','approvals','distribution'] as const
+export type DocumentSection=typeof documentSections[number]
+export const sectionNames:Record<DocumentSection,string>={attendance:'Attendance',minutes:'Minutes',actions:'Action summary',decisions:'Decision summary',approvals:'Approval block',distribution:'Distribution'}
 export interface ExportTemplate {
   id: string; name: string; description: string; documentTitle: string; accent: string; category: string
   sectionTitle: string; subjectHeading: string; ownerHeading: string; statusHeading: string
   decisionLabel: string; actionLabel: string; showAttendance: boolean; showDistribution: boolean
+  referenceHeading?:string;showApprovals?:boolean;sectionOrder?:DocumentSection[]
 }
 
 export const exportTemplates: ExportTemplate[] = [
@@ -16,3 +21,5 @@ export const exportTemplates: ExportTemplate[] = [
 ]
 
 export const getExportTemplate = (id?: string) => exportTemplates.find(template=>template.id===id) ?? exportTemplates[0]
+export const getProfileTemplate=(profile:ExportProfile):ExportTemplate=>profile.templateSnapshot??getExportTemplate(profile.templateId)
+export const orderedSections=(template:ExportTemplate):DocumentSection[]=>[...new Set([...(template.sectionOrder??[]).filter(key=>documentSections.includes(key)),...documentSections])]

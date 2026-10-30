@@ -1,3 +1,4 @@
+import type { ExportTemplate } from './exportTemplates'
 export type Status = 'Open' | 'Ongoing' | 'Overdue' | 'Closed' | 'Info' | '-'
 export type MeetingLifecycle = 'draft_agenda' | 'in_progress' | 'draft_minutes' | 'under_review' | 'finalized'
 export type Block =
@@ -19,6 +20,7 @@ export interface ExportProfile {
   includeActionSummary?: boolean
   includeDecisionSummary?: boolean
   templateId?: string
+  templateSnapshot?: ExportTemplate
   organizationName: string
   projectName: string
   documentTitle: string

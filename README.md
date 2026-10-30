@@ -39,6 +39,14 @@ Choose **Import DOCX / PDF** in the meeting library or **Import review** in a me
 
 The importer reads explicit numbered rows and common automatic Word list numbering, including inherited paragraph styles, decimal levels, letter and Roman labels, start overrides and restarts. Unsupported numbering formats, unusual layouts and ambiguous rows remain flagged for review. Repeated inferred list labels receive a temporary unique suffix and retain their original list text in source evidence. Images, original pagination, headers and footers are not reproduced. Retain the original file for visual comparison. Uploaded files are limited to 15 MB, document XML to 8 MB, numbering to 1 MB, and styles to 2 MB.
 
+## Personal templates
+
+In **Export**, open **Customize layout & personal templates** to edit the reference, discussion, owner and status column labels, minutes heading, decision/action labels, attendance/distribution/approval visibility, and document section order. Minutes remain required; action and decision summary switches control those optional sections. The preview, standalone HTML, browser print/PDF and editable Word output use the same saved layout settings.
+
+Use **Save as personal template** to keep a copy in this browser (up to 20). Apply it to another meeting from **Saved personal template**, or update a selected library template from the current layout. Each meeting keeps its own layout snapshot: updating a library template does not change previous meetings or saved final issues. Finalized issues keep layout controls locked until an amendment is created.
+
+Organization name, logo and distribution are included only when explicitly selected. Project names and meeting references are excluded from reusable templates. **Export personal templates** downloads a separate JSON backup; restoring it adds validated copies rather than replacing existing templates. Meeting backups retain the layout applied to that meeting, but do not include the entire personal library. Templates and backups may contain private organization settings; no personal templates are bundled in the public repository. Browser storage failure is reported without claiming a successful save. Existing Word-template file import and visual Word pagination verification remain outstanding.
+
 ## Import correction tools
 
 - Use **Correct item boundaries and order** to move an item with its children, split between content blocks, or merge with the preceding minute. Splitting keeps an existing action on the first item; merging refuses to discard either of two actions.

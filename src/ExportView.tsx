@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { TechnicalTable } from './TechnicalTable'
 import { Download, FileJson, FileSpreadsheet, FileType2, ImagePlus, Printer, ShieldCheck, Trash2 } from 'lucide-react'
 import { exportSnapshot, type ExportProfile, type MeetingDocument } from './model'
-import { exportTemplates, getExportTemplate } from './exportTemplates'
+import { exportTemplates, getProfileTemplate, orderedSections, type DocumentSection } from './exportTemplates'
+import { TemplateDesigner } from './TemplateDesigner'
 import { completenessIssues, documentReference, exportBaseName } from './issueManagement'
 
 export const defaultExportProfile: ExportProfile = {
@@ -49,7 +50,7 @@ export function ExportView({ meeting: workingMeeting, onChange, notify }: { meet
   const locked=!!savedIssue||meeting.lifecycle==='finalized'
   const issues=completenessIssues(meeting)
   const profile = { ...defaultExportProfile, ...meeting.exportProfile }
-  const selectedTemplate = getExportTemplate(profile.templateId)
+  const selectedTemplate = getProfileTemplate(profile)
   const updateProfile = (patch: Partial<ExportProfile>) => onChange({ ...meeting, exportProfile: { ...profile, ...patch } })
   const baseName = exportBaseName(meeting)
   const exportHtml = () => {
@@ -63,7 +64,7 @@ export function ExportView({ meeting: workingMeeting, onChange, notify }: { meet
     if (!['image/png','image/jpeg','image/svg+xml'].includes(file.type) || file.size > 1_000_000) { notify('Choose a PNG, JPG or SVG logo under 1 MB'); return }
     const reader = new FileReader(); reader.onload = () => updateProfile({ logoDataUrl: String(reader.result) }); reader.readAsDataURL(file)
   }
-  const chooseTemplate = (template: typeof exportTemplates[number]) => updateProfile({templateId:template.id,documentTitle:template.documentTitle,primaryColor:template.accent})
+  const chooseTemplate = (template: typeof exportTemplates[number]) => updateProfile({templateId:template.id,templateSnapshot:structuredClone(template),documentTitle:template.documentTitle,primaryColor:template.accent})
   const printPdf = () => { notify('Use the print dialog to save as PDF'); window.setTimeout(() => window.print(), 100) }
   const exportWord = async () => {
     setGeneratingWord(true)
@@ -74,7 +75,7 @@ export function ExportView({ meeting: workingMeeting, onChange, notify }: { meet
   return <main className="export-page" id="main-content">
     <section className="export-controls">
       <div><span className="eyebrow">Phase 5 · Official output</span><h1>Publish-ready minutes</h1><p>Set document identity at runtime. Nothing here is embedded in the public app source.</p></div>
-      <div className="privacy-note"><ShieldCheck size={19}/><span><b>Project-neutral by design</b> Identity and logo are saved only with this local meeting record.</span></div>
+      <div className="privacy-note"><ShieldCheck size={19}/><span><b>Project-neutral by design</b> Identity stays in this browser and your exported backups. Save organization settings to a personal template only when you choose.</span></div>
       <label className="issue-selector">Export version<select value={issueRevision} onChange={e=>setIssueRevision(e.target.value)}><option value="working">Current record · R{workingMeeting.revision??1}</option>{(workingMeeting.finalIssues??[]).map(issue=><option key={issue.revision} value={issue.revision}>Saved final · R{issue.revision}</option>)}</select></label>
       <details className="export-readiness" open={issues.length>0}><summary>{issues.length?`${issues.length} readiness items · draft export available`:'Readiness checks passed'}</summary>{issues.length>0&&<ul>{issues.map((issue,index)=><li key={index}>{issue}</li>)}</ul>}<p>Resolve these items in Prepare, Live meeting and Review before finalizing.</p></details>
       {locked&&<p className="export-hint">This issue is read-only. Create an amendment in Review to change its contents or document settings.</p>}
@@ -90,6 +91,7 @@ export function ExportView({ meeting: workingMeeting, onChange, notify }: { meet
         <label className="wide">Distribution<textarea value={profile.distribution} placeholder="Optional recipients or distribution note" onChange={e=>updateProfile({distribution:e.target.value})}/></label>
         <div className="logo-control"><span>Document logo (optional)</span><div>{profile.logoDataUrl&&<img src={profile.logoDataUrl} alt="Current document logo"/>}<label className="secondary-button"><ImagePlus size={16}/> Choose logo<input type="file" accept="image/png,image/jpeg,image/svg+xml" onChange={e=>uploadLogo(e.target.files?.[0])}/></label>{profile.logoDataUrl&&<button className="icon-button" onClick={()=>updateProfile({logoDataUrl:undefined})} aria-label="Remove logo"><Trash2 size={16}/></button>}</div></div>
       </fieldset>
+      <TemplateDesigner profile={profile} locked={locked} onChange={updateProfile} notify={notify}/>
       <div className="export-actions">
         <button className="primary" onClick={exportWord} disabled={generatingWord}><FileType2 size={17}/> {generatingWord?'Building Word…':'Editable Word'}</button>
         <button className="primary" onClick={printPdf}><Printer size={17}/> Print / Save PDF</button>
@@ -107,18 +109,21 @@ export function ExportView({ meeting: workingMeeting, onChange, notify }: { meet
 
 function OfficialDocument({ meeting, profile }: { meeting: MeetingDocument; profile: ExportProfile }) {
   const minutes = meeting.items.filter(item => item.type === 'minute')
-  const template = getExportTemplate(profile.templateId)
+  const template = getProfileTemplate(profile)
+  const sections:Record<DocumentSection,React.ReactNode>={
+    attendance:(template.showAttendance&&!!meeting.participants?.length&&<><h2>Attendance</h2><table><thead><tr><th>Name</th><th>Organization</th><th>Role</th><th>Attendance</th></tr></thead><tbody>{meeting.participants.map(p=><tr key={p.id}><td>{p.name}</td><td>{p.organization}</td><td>{p.role}</td><td>{p.attendance}</td></tr>)}</tbody></table></>),
+    minutes:(<> <h2>{template.sectionTitle}</h2><table className="minutes-table"><thead><tr><th className="ref-col">{template.referenceHeading??'No.'}</th><th>{template.subjectHeading}</th><th className="owner-col">{template.ownerHeading}</th><th className="status-col">{template.statusHeading}</th></tr></thead><tbody>{meeting.items.map(item=>item.type==='section'?<tr className="section-row" key={item.id}><th colSpan={4}>{item.itemRef} {item.title}</th></tr>:<tr key={item.id}><td>{item.itemRef}</td><td><div className="minute-title" style={{marginLeft:`${Math.max(0,item.depth-1)*10}px`}}>{item.title}</div>{item.discussion&&<div className="minute-copy">{item.discussion}</div>}{item.blocks.map((block,index)=>block.type==='paragraph'?<div className="minute-copy" key={index}>{block.text}</div>:<TechnicalTable key={index} block={block}/>)}{item.decision&&<div className="minute-decision"><b>{template.decisionLabel}:</b> {item.decision}</div>}{item.action&&<div className="minute-decision"><b>{template.actionLabel}:</b> {item.action.requiredAction}<br/><b>Due:</b> {item.action.deadline || 'Not set'}</div>}</td><td>{item.action?.owner || item.owner}</td><td>{item.action?.status || item.status}</td></tr>)}</tbody></table></>),
+    actions:(profile.includeActionSummary&&<section className="document-summary"><h2>Action summary</h2>{minutes.some(item=>item.action)?<table><thead><tr><th>Minute / action</th><th>Required action</th><th>Owner</th><th>Due</th><th>Status</th></tr></thead><tbody>{minutes.filter(item=>item.action).map(item=><tr key={item.id}><td>{item.itemRef} / {item.action!.actionRef}</td><td>{item.action!.requiredAction}</td><td>{item.action!.owner}</td><td>{item.action!.deadline}</td><td>{item.action!.status}</td></tr>)}</tbody></table>:<p>No actions recorded.</p>}</section>),
+    decisions:(profile.includeDecisionSummary&&<section className="document-summary"><h2>Decision summary</h2>{minutes.some(item=>item.decision?.trim())?<table><thead><tr><th>Minute</th><th>Decision</th></tr></thead><tbody>{minutes.filter(item=>item.decision?.trim()).map(item=><tr key={item.id}><td>{item.itemRef}</td><td>{item.decision}</td></tr>)}</tbody></table>:<p>No decisions recorded.</p>}</section>),
+    approvals:(template.showApprovals!==false&&<div className="approval-grid"><div className="approval-box"><span>Prepared by</span>{meeting.preparedBy || '—'}</div><div className="approval-box"><span>Checked by</span>{meeting.checkedBy || '—'}</div><div className="approval-box"><span>Approved by</span>{meeting.approvedBy || '—'}</div></div>),
+    distribution:(template.showDistribution&&profile.distribution&&<div className="distribution"><b>Distribution</b><div>{profile.distribution}</div></div>),
+  }
   return <article className="official-document" style={{'--doc-color': profile.primaryColor} as React.CSSProperties}>
     {meeting.lifecycle!=='finalized'&&<div className="draft-watermark">DRAFT</div>}
     <header className="document-masthead">{profile.logoDataUrl?<img className="document-logo" src={profile.logoDataUrl} alt="Organization logo"/>:<div/>}<div className="document-brand">{profile.projectName&&<span>{profile.projectName}</span>}<b>{profile.organizationName || 'Meeting workspace'}</b></div><div className="issue-badge">Issue<b>{meeting.lifecycle==='finalized'?'Final':'Draft'}</b>Revision {meeting.revision ?? 1}</div></header>
     <h1>{profile.documentTitle}</h1><p className="document-subtitle">{meeting.title}</p>
     <p className="document-reference">Document reference: {documentReference(meeting)} · R{meeting.revision??1}</p>
     <table className="metadata"><tbody><tr><th>Meeting type</th><td>{meeting.meetingType}</td><th>Meeting no.</th><td>{meeting.meetingNumber}</td></tr><tr><th>Date</th><td>{meeting.date}</td><th>Venue</th><td>{meeting.venue}</td></tr><tr><th>Chair</th><td>{meeting.chair}</td><th>Status</th><td>{meeting.lifecycle.replaceAll('_',' ')}</td></tr></tbody></table>
-    {template.showAttendance&&!!meeting.participants?.length&&<><h2>Attendance</h2><table><thead><tr><th>Name</th><th>Organization</th><th>Role</th><th>Attendance</th></tr></thead><tbody>{meeting.participants.map(p=><tr key={p.id}><td>{p.name}</td><td>{p.organization}</td><td>{p.role}</td><td>{p.attendance}</td></tr>)}</tbody></table></>}
-    <h2>{template.sectionTitle}</h2><table className="minutes-table"><thead><tr><th className="ref-col">No.</th><th>{template.subjectHeading}</th><th className="owner-col">{template.ownerHeading}</th><th className="status-col">{template.statusHeading}</th></tr></thead><tbody>{meeting.items.map(item=>item.type==='section'?<tr className="section-row" key={item.id}><th colSpan={4}>{item.itemRef} {item.title}</th></tr>:<tr key={item.id}><td>{item.itemRef}</td><td><div className="minute-title" style={{marginLeft:`${Math.max(0,item.depth-1)*10}px`}}>{item.title}</div>{item.discussion&&<div className="minute-copy">{item.discussion}</div>}{item.blocks.map((block,index)=>block.type==='paragraph'?<div className="minute-copy" key={index}>{block.text}</div>:<TechnicalTable key={index} block={block}/>)}{item.decision&&<div className="minute-decision"><b>{template.decisionLabel}:</b> {item.decision}</div>}{item.action&&<div className="minute-decision"><b>{template.actionLabel}:</b> {item.action.requiredAction}<br/><b>Due:</b> {item.action.deadline || 'Not set'}</div>}</td><td>{item.action?.owner || item.owner}</td><td>{item.action?.status || item.status}</td></tr>)}</tbody></table>
-    {profile.includeActionSummary&&<section className="document-summary"><h2>Action summary</h2>{minutes.some(item=>item.action)?<table><thead><tr><th>Minute / action</th><th>Required action</th><th>Owner</th><th>Due</th><th>Status</th></tr></thead><tbody>{minutes.filter(item=>item.action).map(item=><tr key={item.id}><td>{item.itemRef} / {item.action!.actionRef}</td><td>{item.action!.requiredAction}</td><td>{item.action!.owner}</td><td>{item.action!.deadline}</td><td>{item.action!.status}</td></tr>)}</tbody></table>:<p>No actions recorded.</p>}</section>}
-    {profile.includeDecisionSummary&&<section className="document-summary"><h2>Decision summary</h2>{minutes.some(item=>item.decision?.trim())?<table><thead><tr><th>Minute</th><th>Decision</th></tr></thead><tbody>{minutes.filter(item=>item.decision?.trim()).map(item=><tr key={item.id}><td>{item.itemRef}</td><td>{item.decision}</td></tr>)}</tbody></table>:<p>No decisions recorded.</p>}</section>}
-    <div className="approval-grid"><div className="approval-box"><span>Prepared by</span>{meeting.preparedBy || '—'}</div><div className="approval-box"><span>Checked by</span>{meeting.checkedBy || '—'}</div><div className="approval-box"><span>Approved by</span>{meeting.approvedBy || '—'}</div></div>
-    {template.showDistribution&&profile.distribution&&<div className="distribution"><b>Distribution</b><div>{profile.distribution}</div></div>}
+    {orderedSections(template).map(key=><Fragment key={key}>{sections[key]}</Fragment>)}
   </article>
 }
