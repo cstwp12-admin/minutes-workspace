@@ -12,5 +12,6 @@ import './export.css'
 import './import.css'
 import './import-corrections.css'
 import './pdf-preview.css'
+import './ocr.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><ErrorBoundary><PhaseOneApp /></ErrorBoundary></React.StrictMode>)

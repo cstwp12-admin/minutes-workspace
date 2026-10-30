@@ -1,8 +1,10 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { FileUp, ShieldCheck } from 'lucide-react'
 import type { MeetingDocument, MinuteItem, Status } from './model'
 import { TechnicalTable } from './TechnicalTable'
 import { PdfSourcePreview } from './PdfSourcePreview'
+import { ImageSourcePreview } from './ImageSourcePreview'
+import { OcrReview } from './OcrReview'
 import { ItemCorrectionTools, ImportColumnMapping } from './ImportCorrectionTools'
 import { importProblems, reparentImportItem } from './importCorrections'
 
@@ -15,6 +17,9 @@ export function ImportReview({onApprove,onCancel}:{onApprove:(meeting:MeetingDoc
   const [draft,setDraft]=useState<MeetingDocument>()
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[reviewed,setReviewed]=useState(false),[activeId,setActiveId]=useState('')
   const attempt=useRef(0)
+  const controller=useRef<AbortController|undefined>(undefined)
+  const [ocr,setOcr]=useState(false),[ocrMode,setOcrMode]=useState<'missing'|'all'>('missing'),[firstPage,setFirstPage]=useState('1'),[lastPage,setLastPage]=useState('')
+  useEffect(()=>()=>{controller.current?.abort();attempt.current++},[])
   const current=draft?.items.find(item=>item.id===activeId)??draft?.items[0]
   const problems=draft?importProblems(draft):[]
   const commitDraft=(next:MeetingDocument)=>{if(draft&&next!==draft){setHistory(previous=>[...previous,draft].slice(-20));setReviewed(false);setDraft(next)}}
@@ -23,9 +28,10 @@ export function ImportReview({onApprove,onCancel}:{onApprove:(meeting:MeetingDoc
   const undo=()=>{const previous=history.at(-1);if(previous){setDraft(previous);setHistory(history.slice(0,-1));setReviewed(false);setError('')}}
   const load=async(file?:File)=>{
     if(!file)return
-    const id=++attempt.current
+    controller.current?.abort();controller.current=new AbortController()
+    const signal=controller.current.signal,id=++attempt.current
     setBusy(true);setError('');setDraft(undefined);setReviewed(false);setSourceFile(file);setProgress('Opening document…');setPreviewPage(undefined);setHistory([])
-    try{let result:MeetingDocument;if(/\.pdf$/i.test(file.name)){const {importPdf}=await import('./pdfImport');result=await importPdf(file,message=>{if(attempt.current===id)setProgress(message)})}else{const {importDocx}=await import('./docxImport');result=await importDocx(file)}if(attempt.current===id){setDraft(result);setActiveId(result.items[0]?.id??'')}}
+    try{let result:MeetingDocument;const report=(message:string)=>{if(attempt.current===id)setProgress(message)};if(/\.pdf$/i.test(file.name)){const {importPdf}=await import('./pdfImport');result=await importPdf(file,report,{ocr:ocr?ocrMode:undefined,firstPage:Number(firstPage),lastPage:lastPage?Number(lastPage):undefined,signal})}else if(/\.(png|jpe?g)$/i.test(file.name)){const {importImage}=await import('./imageImport');result=await importImage(file,report,signal)}else{const {importDocx}=await import('./docxImport');result=await importDocx(file)}if(attempt.current===id){setDraft(result);setActiveId(result.items[0]?.id??'')}}
     catch(reason){if(attempt.current===id)setError(reason instanceof Error?reason.message:'The document could not be imported.')}
     finally{if(attempt.current===id)setBusy(false)}
   }
@@ -38,7 +44,9 @@ export function ImportReview({onApprove,onCancel}:{onApprove:(meeting:MeetingDoc
   }
   return <main className="document-import" id="main-content">
     <header className="import-intro"><div><span className="eyebrow">Document import</span><h1>Review a document as structured minutes.</h1><p>Import creates a new meeting after your review. Files are processed in this browser.</p></div>{onCancel&&<button className="ghost" disabled={busy} onClick={onCancel}>Back to meetings</button>}</header>
-    <label className="import-upload"><FileUp size={25}/><span><b>{busy?progress||'Processing…':'Choose a DOCX or PDF document'}</b><small>Up to 15 MB · Searchable PDF up to 100 pages · Scans need OCR</small></span><input aria-label="Choose DOCX or PDF document" type="file" accept=".docx,.pdf" disabled={busy} onChange={e=>{void load(e.target.files?.[0]);e.target.value=''}}/></label>
+    <fieldset disabled={busy} className="ocr-options"><legend>Scan recognition options</legend><label><input type="checkbox" checked={ocr} onChange={event=>setOcr(event.target.checked)}/>Enable scanned PDF OCR</label><p>PNG and JPEG images always use OCR. English printed text · 15 MB per file · OCR up to 10 pages per import. The first scan downloads the recognition engine and English data from this app; your document stays on this device.</p>{ocr&&<div className="import-fields"><label>OCR mode<select value={ocrMode} onChange={event=>setOcrMode(event.target.value as 'missing'|'all')}><option value="missing">Pages without searchable text</option><option value="all">Every selected page (replace text layer)</option></select></label><label>First PDF page<input type="number" min="1" max="100" value={firstPage} onChange={event=>setFirstPage(event.target.value)}/></label><label>Last PDF page (blank = end)<input type="number" min="1" max="100" value={lastPage} onChange={event=>setLastPage(event.target.value)}/></label></div>}</fieldset>
+    <label className="import-upload"><FileUp size={25}/><span><b>{busy?progress||'Processing…':'Choose a DOCX, PDF or scan image'}</b><small>Up to 15 MB · Searchable PDF up to 100 pages · Scanned PDF or PNG/JPEG with English OCR</small></span><input aria-label="Choose DOCX, PDF or scan image" type="file" accept=".docx,.pdf,.png,.jpg,.jpeg" disabled={busy} onChange={e=>{void load(e.target.files?.[0]);e.target.value=''}}/></label>
+    {busy&&!draft&&<button className="ghost" onClick={()=>{controller.current?.abort();attempt.current++;setBusy(false);setProgress('');setError('Import cancelled. Choose a document to try again.')}}>Cancel import</button>}
     {error&&<p className="import-error" role="alert">{error}</p>}
     {!draft&&!busy&&<div className="import-note"><ShieldCheck size={20}/><p>Review the extracted text, table structure and inferred actions before approving. Keep the original file for page layout, images and formatting.</p></div>}
     {draft&&<>
@@ -46,6 +54,7 @@ export function ImportReview({onApprove,onCancel}:{onApprove:(meeting:MeetingDoc
       <details className="import-findings" open><summary>{draft.importEvidence?.warnings.length??0} review notes · {draft.items.length} items · {draft.importEvidence?.tables.length??0} source tables</summary><ul>{draft.importEvidence?.warnings.map((warning,index)=><li key={index}>{warning}</li>)}</ul></details>
       <div className="import-undo"><button className="ghost" disabled={busy||!history.length} onClick={undo}>Undo correction</button><span>{history.length} undo step{history.length===1?'':'s'} available · latest 20 edits</span></div>
       <ImportColumnMapping meeting={draft} currentId={current?.id} onCommit={commitDraft} onError={setError} disabled={busy}/>
+      <OcrReview meeting={draft} onCommit={commitDraft}/>
       <section className="import-workbench"><aside aria-label="Extracted items"><h2>Reconstructed outline</h2>{draft.items.map(item=><button key={item.id} className={item.id===current?.id?'active':''} onClick={()=>{setActiveId(item.id);setPreviewPage(undefined)}}><b>{item.itemRef}</b><span>{item.title}</span><small>{item.source.page?`Page ${item.source.page} · `:''}T{item.source.table} · row {item.source.row}</small></button>)}</aside>
         {current&&<section className="import-item"><h2>Review item {current.itemRef}</h2><p>{current.source.page?`PDF page ${current.source.page} · `:''}Source table {current.source.table || '—'}, row / paragraph {current.source.row} · {current.source.confidence>=.8?'Recognized pattern':'Check placement'}</p><div className="import-fields"><label>Item reference<input value={current.itemRef} disabled={busy} onChange={e=>changeItem({itemRef:e.target.value})}/></label><label>Item type<select value={current.type} disabled={busy} onChange={e=>changeItem({type:e.target.value as MinuteItem['type']})}><option value="section">Section</option><option value="minute">Minute</option></select></label><label className="full">Item title<input value={current.title} disabled={busy} onChange={e=>changeItem({title:e.target.value})}/></label><label>Parent item<select value={current.parentId??''} disabled={busy} onChange={e=>changeParent(e.target.value||undefined)}><option value="">Top level</option>{draft.items.slice(0,draft.items.indexOf(current)).map(item=><option value={item.id} key={item.id}>{item.itemRef} {item.title.slice(0,70)}</option>)}</select></label><label>Owner<input value={current.owner} disabled={busy} onChange={e=>changeItem({owner:e.target.value})}/></label><label>Status<select value={current.status} disabled={busy} onChange={e=>changeItem({status:e.target.value as Status})}>{statuses.map(status=><option key={status}>{status}</option>)}</select></label></div>
           <ItemCorrectionTools key={current.id} meeting={draft} item={current} onCommit={commitDraft} onError={setError} disabled={busy}/>
@@ -54,7 +63,8 @@ export function ImportReview({onApprove,onCancel}:{onApprove:(meeting:MeetingDoc
         </section>}
       </section>
       {draft.sourceFormat==='PDF'&&sourceFile&&<><label className="pdf-page-selector">Source page<select value={previewPage??current?.source.page??1} onChange={e=>setPreviewPage(Number(e.target.value))}>{draft.importEvidence?.pdfPages?.map(page=><option key={page.page} value={page.page}>Page {page.page}</option>)}</select></label><PdfSourcePreview file={sourceFile} page={previewPage??current?.source.page??1}/></>}
-      <details className="import-evidence"><summary>Source evidence · extracted text and table grids</summary><p>{draft.sourceFormat==='PDF'?'PDF grids are reconstructed. Compare them with the original page preview; all extracted page text remains below.':'These are extracted Word structures, not a page image. Blank merged continuations remain part of the original grid.'}</p>{draft.importEvidence?.paragraphs.map((value,index)=><p key={index}>{value}</p>)}{draft.importEvidence?.tables.map(table=><TechnicalTable key={table.index} block={{type:'metric_table',title:`Source table ${table.index}${table.page?` · page ${table.page}`:''}`,columns:[],rows:[],grid:table.grid}}/>)}</details>
+      {draft.sourceFormat==='IMAGE'&&sourceFile&&<ImageSourcePreview file={sourceFile}/>}
+      <details className="import-evidence"><summary>Source evidence · extracted text and table grids</summary><p>{draft.sourceFormat!=='DOCX'?'Scan and PDF grids are reconstructed. Compare them with the original preview; all extracted page text remains below.':'These are extracted Word structures, not a page image. Blank merged continuations remain part of the original grid.'}</p>{draft.importEvidence?.paragraphs.map((value,index)=><p key={index}>{value}</p>)}{draft.importEvidence?.tables.map(table=><TechnicalTable key={table.index} block={{type:'metric_table',title:`Source table ${table.index}${table.page?` · page ${table.page}`:''}`,columns:[],rows:[],grid:table.grid}}/>)}</details>
       <footer className="import-approval">{problems.length>0&&<ul className="import-validation" role="alert">{problems.map(problem=><li key={problem}>{problem}</li>)}</ul>}<label><input type="checkbox" checked={reviewed} disabled={busy} onChange={e=>setReviewed(e.target.checked)}/>I reviewed the metadata, item hierarchy, technical tables and inferred actions.</label><button className="primary" disabled={busy||!reviewed||problems.length>0} onClick={()=>void approve()}>{busy?'Saving…':'Approve import & create meeting'}</button></footer>
     </>}
   </main>

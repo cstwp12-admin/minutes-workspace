@@ -5,9 +5,10 @@ export type Block =
   | { type: 'metric_table'; title: string; columns: string[]; rows: string[][]; grid?: SourceCell[][] }
 
 export interface SourceCell { column: number; text: string; colSpan: number; rowSpan: number; blocks: Block[] }
-export interface PdfTextSpan { text:string; x:number; y:number; width:number; height:number }
-export interface PdfPageEvidence { page:number; width:number; height:number; spans:PdfTextSpan[] }
-export interface ImportEvidence { tables: { index:number; grid:SourceCell[][]; page?:number; bounds?:number[] }[]; paragraphs:string[]; warnings:string[]; pdfPages?:PdfPageEvidence[] }
+export interface PdfTextSpan { text:string; x:number; y:number; width:number; height:number; confidence?:number }
+export interface PdfPageEvidence { page:number; width:number; height:number; spans:PdfTextSpan[]; origin?:'text'|'ocr' }
+export interface OcrPageEvidence {page:number;confidence:number;text:string;reviewed:boolean;correctedText?:string}
+export interface ImportEvidence { tables: { index:number; grid:SourceCell[][]; page?:number; bounds?:number[] }[]; paragraphs:string[]; warnings:string[]; pdfPages?:PdfPageEvidence[]; ocrPages?:OcrPageEvidence[] }
 
 export interface SourceAnchor { page?: number; table: number; row: number; confidence: number; excerpt: string; continuations?:{page?:number;table:number;row:number}[] }
 export interface Participant { id: string; name: string; organization: string; role: string; attendance: 'expected'|'confirmed'|'apology' }
@@ -31,7 +32,7 @@ export interface MinuteItem {
   id: string; parentId?: string; itemRef: string; depth: number; type: 'section' | 'minute';
   title: string; blocks: Block[]; owner: string; status: Status; action?: ActionItem; source: SourceAnchor; discussion?: string; decision?: string; outcome?: 'pending'|'discussed'|'deferred'|'skipped'; allocatedMinutes?: number
 }
-export interface MeetingDocument { id: string; title: string; meetingType: string; meetingNumber: string; date: string; venue: string; chair: string; sourceFile: string; sourceFormat: 'DOCX'|'PDF'; importStatus: 'review'|'approved'; lifecycle: MeetingLifecycle; updatedAt: string; archivedAt?: string; participants?: Participant[]; reviewComments?: ReviewComment[]; auditEvents?: AuditEvent[]; revision?: number; preparedBy?: string; checkedBy?: string; approvedBy?: string; exportProfile?: ExportProfile; finalIssues?: FinalIssue[]; importEvidence?: ImportEvidence; items: MinuteItem[] }
+export interface MeetingDocument { id: string; title: string; meetingType: string; meetingNumber: string; date: string; venue: string; chair: string; sourceFile: string; sourceFormat: 'DOCX'|'PDF'|'IMAGE'; importStatus: 'review'|'approved'; lifecycle: MeetingLifecycle; updatedAt: string; archivedAt?: string; participants?: Participant[]; reviewComments?: ReviewComment[]; auditEvents?: AuditEvent[]; revision?: number; preparedBy?: string; checkedBy?: string; approvedBy?: string; exportProfile?: ExportProfile; finalIssues?: FinalIssue[]; importEvidence?: ImportEvidence; items: MinuteItem[] }
 
 export const childrenOf = (items: MinuteItem[], id?: string) => items.filter(i => i.parentId === id)
 export const openActionCount = (items: MinuteItem[]) => items.filter(i => i.action && !['Closed','Info','-'].includes(i.action.status)).length

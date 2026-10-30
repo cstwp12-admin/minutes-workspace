@@ -18,7 +18,7 @@ pnpm build
 
 ## Included MVP flow
 
-- Browser-local DOCX and searchable PDF import with source evidence, editable staging and explicit approval into a new meeting
+- Browser-local DOCX, searchable/scanned PDF and PNG/JPEG import with source evidence, editable staging and explicit approval into a new meeting
 - Metadata, attendance, numbered agenda and suggested action extraction
 - Nested technical tables with horizontal and vertical cell spans retained in preview and Word re-export
 - Hierarchical minute references stored as text
@@ -53,4 +53,13 @@ PDFs are read locally with a bundled PDF.js worker. Drawn borders and text coord
 
 The staged review includes the original PDF page rendered on a canvas and a page selector. Extracted text, coordinates and reconstructed grids remain in saved source evidence; original PDF bytes and page images are not stored with the meeting. Keep the original file for later visual comparison.
 
-Limits are 15 MB and 100 pages. Password-protected and invalid PDFs are rejected. Scanned-only PDFs need OCR, which is not implemented; mixed documents import their searchable content and warn about pages without text. Unruled layouts, unusual headers, repeated item references and complex technical grids need manual correction. Reconstructed tables are not a guarantee of the original cell structure.
+Limits are 15 MB and 100 pages. Password-protected and invalid PDFs are rejected. Enable scanned PDF OCR to recognize image pages, or choose OCR for every selected page to replace an unreliable text layer. Unruled layouts, unusual headers, repeated item references and complex technical grids need manual correction. Reconstructed tables are not a guarantee of the original cell structure.
+
+## Scanned PDFs and meeting images · Phase 6.4
+
+- English printed text recognition using Tesseract.js. PNG/JPEG images automatically use OCR; PDFs require the OCR option. Upright, sharp scans work best; handwriting and rotated or complex layouts are not reliable.
+- OCR imports are limited to 10 selected PDF pages, 15 MB per file and 40 megapixels per image. Set first/last PDF page before selecting the file. Blank last page means document end. Pages outside the selected range are explicitly excluded.
+- Recognition renders at up to 2,200 pixels on the longest side. Long dark borders and word positions feed the same table reconstruction and nested item review used by searchable PDFs. Check every technical value, merged cell and nested reference against the original preview.
+- Review each page's engine confidence and editable transcript. Saving a transcript retains the original OCR text separately and resets that page's review acknowledgement. Transcript corrections do not automatically replace structured minutes: use the existing item, source column and technical table correction tools. Every recognized page needs acknowledgement before approval.
+- Cancel stops an import without creating a meeting. The original PDF/image is available during staging only; retain it separately. Backups include recognition evidence and corrected transcripts, so treat backup files as private meeting data.
+- Worker, WASM cores and English language data are copied from installed packages into generated `public/ocr/` assets by the dev/build commands. GitHub Pages serves these assets from the app's own origin. No document is uploaded to an OCR service. Initial recognition needs network access to download the engine and roughly 11 MB of compressed English data; offline OCR is not guaranteed.

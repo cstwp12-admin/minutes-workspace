@@ -6,3 +6,4 @@
 - Public client configuration may use an anonymous Supabase key only after row-level security is enabled and tested.
 - Add organization branding through runtime configuration or user uploads, not application source.
 - Run the sensitive-term audit before each public release.
+- OCR runs in a browser worker. Recognition assets are downloaded from this app's hosting; source scans, recognized text and corrections are not transmitted to an OCR service. Local backups include that text and should be handled as private documents.

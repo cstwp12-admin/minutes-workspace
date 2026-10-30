@@ -3,6 +3,7 @@ import type { Block, MeetingDocument, MinuteItem, SourceCell, Status } from './m
 export function importProblems(meeting:MeetingDocument):string[]{
   const issues:string[]=[],refs=new Set<string>(),ids=new Map(meeting.items.map(item=>[item.id,item]))
   if(!meeting.title.trim())issues.push('Meeting title is required.')
+  for(const page of meeting.importEvidence?.ocrPages??[])if(!page.reviewed)issues.push(`OCR page ${page.page} must be checked against its preview before approval.`)
   if(!meeting.items.some(item=>item.type==='minute'))issues.push('At least one minute is required.')
   for(const item of meeting.items){
     if(!item.itemRef.trim())issues.push('An item needs a reference.')
