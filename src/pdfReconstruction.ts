@@ -161,7 +161,7 @@ export function reconstructPdf(pages:PdfPageEvidence[],tables:PdfTable[],filenam
   },[])
   meeting.items.forEach(item=>{if(item.parentId&&mergedIds.has(item.parentId))item.parentId=mergedIds.get(item.parentId)})
   meeting.title=meeting.title.replace(/\.docx$/i,'')
-  meeting.importEvidence={tables:evidenceTables,paragraphs:pages.flatMap(page=>textLines(page.spans).map(line=>`Page ${page.page}: ${line.text}`)),pdfPages:pages,warnings:[...warnings,...(meeting.importEvidence?.warnings??[]).filter(warning=>!warning.includes('Word')&&!warning.includes('Table '))]}
+  meeting.importEvidence={tables:evidenceTables,paragraphs:pages.flatMap(page=>textLines(page.spans).map(line=>`Page ${page.page}: ${line.text}`)),pdfPages:pages,warnings:[...warnings,...(meeting.importEvidence?.warnings??[]).filter(warning=>!warning.includes('Word')&&!warning.includes('Table ')&&!meeting.items.some(item=>item.action?.deadline&&warning===`${item.itemRef}: verify the action deadline; no unambiguous date was found.`))]}
   meeting.importEvidence.warnings.push('PDF tables and merged cells are reconstructed from drawing lines and text positions. Verify technical tables, repeated headers, cross-page continuations and action matches against the page preview.')
   if(!tables.length)meeting.importEvidence.warnings.push('No ruled tables were found. Numbered text was retained, but owners, statuses and column boundaries need manual review.')
   return meeting

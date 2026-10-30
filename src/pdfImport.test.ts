@@ -26,6 +26,7 @@ describe('searchable PDF import',()=>{
     expect(minute.blocks.some(block=>block.type==='metric_table')).toBe(true)
     expect(meeting.items.find(item=>item.itemRef==='1.2')?.source.page).toBe(2)
     expect(meeting.items.find(item=>item.itemRef==='1.2')?.action).toMatchObject({requiredAction:'Provide closeout evidence',deadline:'2026-11-07'})
+    expect(meeting.importEvidence?.warnings).not.toContain('1.2: verify the action deadline; no unambiguous date was found.')
   })
   it('rejects empty scanned-style files and invalid PDF bytes clearly',async()=>{
     await expect(importPdf(file(makePdf([''])))).rejects.toThrow('OCR')
