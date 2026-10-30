@@ -2,8 +2,8 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { extname, join, relative } from 'node:path'
 
 const root = new URL('..', import.meta.url).pathname.replace(/^\/(.:)/, '$1')
-const scanRoots = ['src', 'docs', '.github', 'README.md', 'index.html', 'package.json']
-const textExtensions = new Set(['.ts','.tsx','.css','.md','.html','.json','.yml','.yaml'])
+const scanRoots = ['src', 'docs', 'supabase', '.github', 'README.md', 'index.html', 'package.json']
+const textExtensions = new Set(['.ts','.tsx','.css','.md','.html','.json','.yml','.yaml','.sql'])
 const forbidden = [
   /WP12/i, /Pan Borneo/i, /Sarang/i, /Temuno/i, /QAQC/i,
   /-----BEGIN (?:RSA |EC )?PRIVATE KEY-----/i,

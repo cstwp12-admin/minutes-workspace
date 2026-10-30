@@ -33,6 +33,10 @@ pnpm build
 
 The included Northstar programme is fictional demonstration data. Real documents stay local to the user's browser in this MVP.
 
+## Optional team workspaces
+
+Phase 7.1 adds an opt-in Supabase connection, existing-account sign-in, shared workspace and member management, viewer/editor/owner access, explicitly shared meeting copies, version-checked saves and conflict recovery. Individual use remains available without connecting. Team mode is unconfigured until your administrator installs the included database migration and supplies a project URL and publishable key. See [team setup and limitations](docs/TEAM_SETUP.md). No live Supabase project is bundled or provisioned by the public app.
+
 ## DOCX import
 
 Choose **Import DOCX / PDF** in the meeting library or **Import review** in a meeting. Review the extracted details, source evidence and item hierarchy; correct text, references, owners and deadlines; remove or add inferred actions. Acknowledge the review and approve to save a separate meeting. Original meetings are not replaced.

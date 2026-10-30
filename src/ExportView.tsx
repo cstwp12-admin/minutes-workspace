@@ -42,12 +42,12 @@ const printableStyles = `
   @page{size:A4;margin:10mm} @media print{.official-document{max-width:none;padding:0}thead{display:table-header-group}.nested-table tr{break-inside:avoid}h2{break-after:avoid}.approval-grid{break-inside:avoid}.minutes-table>tbody>tr,.nested-table{break-inside:auto}.draft-watermark{position:fixed}}
 `
 
-export function ExportView({ meeting: workingMeeting, onChange, notify }: { meeting: MeetingDocument; onChange: (meeting: MeetingDocument) => void; notify: (message: string) => void }) {
+export function ExportView({ meeting: workingMeeting, onChange, notify,readOnly=false }: { meeting: MeetingDocument; onChange: (meeting: MeetingDocument) => void; notify: (message: string) => void;readOnly?:boolean }) {
   const [generatingWord,setGeneratingWord]=useState(false)
   const [issueRevision,setIssueRevision]=useState('working')
   const savedIssue=(workingMeeting.finalIssues??[]).find(issue=>String(issue.revision)===issueRevision)
   const meeting:MeetingDocument=savedIssue?savedIssue.record:workingMeeting
-  const locked=!!savedIssue||meeting.lifecycle==='finalized'
+  const locked=readOnly||!!savedIssue||meeting.lifecycle==='finalized'
   const issues=completenessIssues(meeting)
   const profile = { ...defaultExportProfile, ...meeting.exportProfile }
   const selectedTemplate = getProfileTemplate(profile)
@@ -78,7 +78,7 @@ export function ExportView({ meeting: workingMeeting, onChange, notify }: { meet
       <div className="privacy-note"><ShieldCheck size={19}/><span><b>Project-neutral by design</b> Identity stays in this browser and your exported backups. Save organization settings to a personal template only when you choose.</span></div>
       <label className="issue-selector">Export version<select value={issueRevision} onChange={e=>setIssueRevision(e.target.value)}><option value="working">Current record · R{workingMeeting.revision??1}</option>{(workingMeeting.finalIssues??[]).map(issue=><option key={issue.revision} value={issue.revision}>Saved final · R{issue.revision}</option>)}</select></label>
       <details className="export-readiness" open={issues.length>0}><summary>{issues.length?`${issues.length} readiness items · draft export available`:'Readiness checks passed'}</summary>{issues.length>0&&<ul>{issues.map((issue,index)=><li key={index}>{issue}</li>)}</ul>}<p>Resolve these items in Prepare, Live meeting and Review before finalizing.</p></details>
-      {locked&&<p className="export-hint">This issue is read-only. Create an amendment in Review to change its contents or document settings.</p>}
+      {locked&&<p className="export-hint">{readOnly?'Viewer access: document settings are read-only. Export is available.':'This issue is read-only. Create an amendment in Review to change its contents or document settings.'}</p>}
       <fieldset className="template-picker" disabled={locked}><legend>Document template</legend><div className="template-grid">{exportTemplates.map(template=><button type="button" key={template.id} className={selectedTemplate.id===template.id?'selected':''} onClick={()=>chooseTemplate(template)} aria-pressed={selectedTemplate.id===template.id}><span className="template-swatch" style={{background:template.accent}}/><span><b>{template.name}</b><small>{template.category} · {template.description}</small></span></button>)}</div></fieldset>
       <fieldset className="export-form" disabled={locked}><legend>Document settings</legend>
         <label className="wide">Document reference<input value={profile.documentReference??''} placeholder={documentReference(meeting)} onChange={e=>updateProfile({documentReference:e.target.value})}/></label>

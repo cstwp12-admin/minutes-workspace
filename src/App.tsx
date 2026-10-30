@@ -13,14 +13,15 @@ import { exportSnapshot, openActionCount, type MeetingDocument, type MinuteItem,
 type View = 'prepare'|'live'|'review'|'import'|'editor'|'presenter'|'actions'|'export'
 const statusClass = (s: Status) => `status status-${s.toLowerCase().replace(' ','-')}`
 
-function App({initialMeeting=sampleMeeting,onMeetingChange,onBack,onImportMeeting}:{initialMeeting?:MeetingDocument;onMeetingChange?:(meeting:MeetingDocument)=>void;onBack?:()=>void;onImportMeeting?:(meeting:MeetingDocument)=>Promise<void>|void}){
+function App({initialMeeting=sampleMeeting,onMeetingChange,onBack,onImportMeeting,readOnly=false,saveDelay=250,allowImport=true}:{initialMeeting?:MeetingDocument;onMeetingChange?:(meeting:MeetingDocument)=>void;onBack?:()=>void;onImportMeeting?:(meeting:MeetingDocument)=>Promise<void>|void;readOnly?:boolean;saveDelay?:number;allowImport?:boolean}){
   const [meeting,setMeetingState]=useState<MeetingDocument>(initialMeeting)
   const setMeeting=(update:SetStateAction<MeetingDocument>)=>setMeetingState(previous=>{
+    if(readOnly)return previous
     const next=typeof update==='function'?update(previous):update
     if(previous.lifecycle==='finalized' && !(next.lifecycle==='draft_minutes' && next.revision===(previous.revision??1)+1)) return previous
     return next
   })
-  const [view,setView]=useState<View>('editor')
+  const [view,setView]=useState<View>(readOnly?'presenter':'editor')
   const [currentId,setCurrentId]=useState('m31')
   const [query,setQuery]=useState('')
   const [filter,setFilter]=useState<Status|'All'>('All')
@@ -31,17 +32,17 @@ function App({initialMeeting=sampleMeeting,onMeetingChange,onBack,onImportMeetin
   const updateItem=(id:string, patch:Partial<MinuteItem>)=>setMeeting(m=>({...m,items:m.items.map(i=>i.id===id?{...i,...patch}:i)}))
   const step=(d:number)=>{const idx=minutes.findIndex(i=>i.id===current.id);setCurrentId(minutes[Math.max(0,Math.min(minutes.length-1,idx+d))].id)}
   const exportJson=()=>{const blob=new Blob([exportSnapshot(meeting)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${meeting.id}-reviewed.json`;a.click();URL.revokeObjectURL(a.href);setToast('Canonical meeting package exported')}
-  useEffect(()=>{const timer=setTimeout(()=>onMeetingChange?.({...meeting,updatedAt:new Date().toISOString()}),250);return()=>clearTimeout(timer)},[meeting,onMeetingChange])
+  useEffect(()=>{if(readOnly||meeting===initialMeeting)return;if(saveDelay===0){onMeetingChange?.(meeting);return}const timer=setTimeout(()=>onMeetingChange?.({...meeting,updatedAt:new Date().toISOString()}),saveDelay);return()=>clearTimeout(timer)},[meeting,onMeetingChange,initialMeeting,readOnly,saveDelay])
 
   return <div className={`app ${view==='presenter'?'presenter-mode':''}`}>
     <a className="skip-link" href="#main-content">Skip to meeting content</a>
     <header className="topbar"><div className="brand"><span className="brand-mark" aria-hidden="true">MW</span><div><strong>{publicAppConfig.productName}</strong><small>{publicAppConfig.productTagline}</small></div></div><div className="meeting-title"><span className="eyebrow">{meeting.meetingType} · No. {meeting.meetingNumber}</span><b>{meeting.title}</b></div><div className="top-actions">{onBack&&<button className="ghost" onClick={onBack}><LayoutDashboard size={17}/> Dashboard</button>}<button className="ghost" onClick={()=>setView('presenter')}><MonitorPlay size={17}/> Present</button><button className="primary" onClick={()=>setView('export')}><Download size={17}/> Export</button></div></header>
-    <nav className="modebar" aria-label="Workspace views">{([['prepare','Prepare',ClipboardList],['live','Live meeting',Radio],['review','Review',ClipboardCheck],['import','Import review',FileUp],['editor','Secretary',PanelLeft],['presenter','Presenter',MonitorPlay],['actions','Actions',Archive],['export','Export',FileOutput]] as const).map(([key,label,Icon])=><button key={key} className={view===key?'active':''} onClick={()=>setView(key)}><Icon size={16}/>{label}{key==='actions'&&<span className="count">{openActionCount(meeting.items)}</span>}</button>)}</nav>
+    <nav className="modebar" aria-label="Workspace views">{([['prepare','Prepare',ClipboardList],['live','Live meeting',Radio],['review','Review',ClipboardCheck],['import','Import review',FileUp],['editor','Secretary',PanelLeft],['presenter','Presenter',MonitorPlay],['actions','Actions',Archive],['export','Export',FileOutput]] as const).filter(([key])=>(!readOnly||['presenter','actions','export'].includes(key))&&(key!=='import'||allowImport)).map(([key,label,Icon])=><button key={key} className={view===key?'active':''} onClick={()=>setView(key)}><Icon size={16}/>{label}{key==='actions'&&<span className="count">{openActionCount(meeting.items)}</span>}</button>)}</nav>
     {meeting.lifecycle==='finalized'&&<div className="final-lock-note" role="status">Final issue R{meeting.revision??1} is read-only. Open Review → Create amendment to make changes.</div>}
     {view==='prepare'?<PreparationView meeting={meeting} onChange={setMeeting}/>:
      view==='live'?<LiveMeetingView meeting={meeting} onChange={setMeeting}/>:
      view==='review'?<ReviewView meeting={meeting} onChange={setMeeting}/>:
-     view==='export'?<ExportView meeting={meeting} onChange={setMeeting} notify={setToast}/>:
+     view==='export'?<ExportView meeting={meeting} onChange={setMeeting} notify={setToast} readOnly={readOnly}/>:
      view==='import'?<ImportReview onApprove={async imported=>{if(onImportMeeting)await onImportMeeting(imported);else setToast('Open the app dashboard to save imported meetings')}}/>:
      view==='actions'?<ActionRegister meeting={meeting} setCurrentId={id=>{setCurrentId(id);setView('editor')}}/>:
      <main className="workspace" id="main-content">

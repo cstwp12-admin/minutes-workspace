@@ -4,9 +4,11 @@ Minutes Workspace is intentionally split into three layers:
 
 1. **Canonical meeting model** — meeting metadata, hierarchical agenda items, content blocks, actions, statuses and source anchors.
 2. **Application UI** — import review, secretary workspace, presenter view and action register.
-3. **Persistence adapters** — IndexedDB for browser-local meetings, followed by a future optional Supabase adapter for team workspaces.
+3. **Persistence adapters** — IndexedDB for browser-local meetings, plus an optional Supabase team repository with a separate library and explicit sharing.
 
 The UI must not depend directly on Supabase. Both individual and team modes will implement the same repository interface so a meeting can be exported, restored or migrated without changing its meaning.
+
+Phase 7.1 exposes a TeamRepository contract for cloud operations. The SDK adapter is loaded only after an explicit connection. Local IndexedDB APIs remain independent. Shared records carry server versions outside the canonical MeetingDocument; optimistic saves and server-side role checks protect team data. An opened team draft never follows polling updates automatically. Team changes use explicit Save to team; local editing retains browser autosave. No backend configuration is embedded in a build. See TEAM_SETUP.md for the SQL and security model.
 
 ## Data and privacy boundaries
 

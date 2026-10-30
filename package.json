@@ -16,6 +16,7 @@
     "check": "pnpm audit:privacy && pnpm test && pnpm build"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
     "@tesseract.js-data/eng": "^1.0.0",
     "@vitejs/plugin-react": "latest",
     "docx": "^9.15.0",
@@ -30,6 +31,7 @@
     "vite": "latest"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.13",
     "@testing-library/jest-dom": "latest",
     "@testing-library/react": "latest",
     "@testing-library/user-event": "latest",
