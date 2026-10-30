@@ -186,6 +186,7 @@ export function parseDocxXml(xml:string,filename='meeting.docx'):MeetingDocument
         if(rawStatus.trim()&&parseStatus(rawStatus)==='-'&&rawStatus.trim()!=='-')warnings.add(`${ref}: status “${rawStatus}” was not mapped; check the original.`)
         extractSubactions(item,blocks)
       }else if(last&&row.some(c=>c.text||c.blocks.some(b=>b.type==='metric_table'))){
+        last.source.continuations=[...(last.source.continuations??[]),{table:index,row:ri+1}]
         last.blocks.push(...(blocks.length?blocks:[tableBlock([row],`Unnumbered source row · table ${index}, row ${ri+1}`)]))
         last.source.confidence=Math.min(last.source.confidence,.6)
         warnings.add(`Table ${index}, row ${ri+1}: retained as a continuation of ${last.itemRef}; verify placement.`)

@@ -5,9 +5,11 @@ export type Block =
   | { type: 'metric_table'; title: string; columns: string[]; rows: string[][]; grid?: SourceCell[][] }
 
 export interface SourceCell { column: number; text: string; colSpan: number; rowSpan: number; blocks: Block[] }
-export interface ImportEvidence { tables: { index:number; grid:SourceCell[][] }[]; paragraphs:string[]; warnings:string[] }
+export interface PdfTextSpan { text:string; x:number; y:number; width:number; height:number }
+export interface PdfPageEvidence { page:number; width:number; height:number; spans:PdfTextSpan[] }
+export interface ImportEvidence { tables: { index:number; grid:SourceCell[][]; page?:number; bounds?:number[] }[]; paragraphs:string[]; warnings:string[]; pdfPages?:PdfPageEvidence[] }
 
-export interface SourceAnchor { page?: number; table: number; row: number; confidence: number; excerpt: string }
+export interface SourceAnchor { page?: number; table: number; row: number; confidence: number; excerpt: string; continuations?:{page?:number;table:number;row:number}[] }
 export interface Participant { id: string; name: string; organization: string; role: string; attendance: 'expected'|'confirmed'|'apology' }
 export interface ReviewComment { id: string; minuteItemId: string; text: string; resolved: boolean; createdAt: string }
 export interface AuditEvent { id: string; action: string; at: string }

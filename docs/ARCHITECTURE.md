@@ -29,4 +29,8 @@ The DOCX parser loads only the main document XML from a bounded ZIP archive and 
 
 Import staging owns an independent draft until approval. Each imported record keeps extracted table grids, body paragraphs, original references and review notes in its local source evidence. Rich table cells carry column positions and row/column spans alongside recursively nested content blocks. The preview and Word export consume the same cell model.
 
-Pattern confidence values are review hints, not calibrated accuracy measurements. Word pages are not inferred from XML. PDF parsing remains a separate future path.
+Pattern confidence values are review hints, not calibrated accuracy measurements. Word pages are not inferred from XML.
+
+The PDF reader is loaded on demand with a bundled local worker. Its geometry layer clusters text and merges overlapping border strokes before constructing table grids. A reconstruction adapter feeds common minutes structures into the canonical importer and maps resulting anchors back to PDF pages and source grids. All page text and positions remain in evidence, including text that could not be classified. Page previews use the staged File object; the original PDF is not persisted.
+
+PDF extraction and reconstruction have file, page, text, operator and grid limits. OCR and password entry are not included. PDF JavaScript, attachments and external links are not executed by the review interface.

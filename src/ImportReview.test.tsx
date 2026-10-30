@@ -10,7 +10,7 @@ test('imports, corrects and approves a new record only after acknowledgement',as
   const bytes=zipSync({'word/document.xml':strToU8(fictionalMinutesXml)})
   const file=new File([bytes],'fictional.docx',{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'})
   Object.defineProperty(file,'arrayBuffer',{value:async()=>bytes.buffer})
-  await user.upload(screen.getByLabelText('Choose DOCX document'),file)
+  await user.upload(screen.getByLabelText('Choose DOCX or PDF document'),file)
   const title=await screen.findByLabelText('Meeting title')
   const button=screen.getByRole('button',{name:'Approve import & create meeting'})
   expect(button).toBeDisabled()
